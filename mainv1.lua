@@ -126,7 +126,7 @@ local function setupCoreGuiParenting()
     ManualTeleportFrame.Parent = Frame
     ManualTeleportTitle.Parent = ManualTeleportFrame
     TeleportLocationSelector.Parent = ManualTeleportFrame -- Changed parent
-    TeleportDropdownOptionsFrame.Parent = ManualTeleportFrame
+    -- TeleportDropdownOptionsFrame.Parent will be set dynamically to Frame
     TeleportButton.Parent = ManualTeleportFrame
     LogFrame.Parent = Frame
     LogTitle.Parent = LogFrame
@@ -146,8 +146,7 @@ Frame.Active = true
 Frame.Draggable = true
 Frame.BorderSizePixel = 2
 Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Awalnya merah, akan dianimasikan
-Frame.ClipsDescendants = true -- Penting untuk animasi masuk/keluar elemen
-
+Frame.ClipsDescendants = false -- Changed to false to allow dropdown to extend outside
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 10) -- Sudut lebih membulat
 UICorner.Parent = Frame
@@ -282,7 +281,7 @@ ManualTeleportFrame.Position = UDim2.new(0, 20, 0, yOffsetForManualTeleport)
 ManualTeleportFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 ManualTeleportFrame.BorderSizePixel = 1
 ManualTeleportFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
-ManualTeleportFrame.ClipsDescendants = true -- Penting untuk dropdown
+ManualTeleportFrame.ClipsDescendants = false -- Changed to false to allow dropdown to extend outside
 ManualTeleportFrame.ZIndex = 2
 
 local ManualFrameCorner = Instance.new("UICorner")
@@ -318,12 +317,13 @@ SelectorCorner.CornerRadius = UDim.new(0, 3)
 SelectorCorner.Parent = TeleportLocationSelector
 
 -- Dropdown Options Frame (ScrollingFrame)
-TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, 100) -- Height will expand
-TeleportDropdownOptionsFrame.Position = UDim2.new(0, 10, 0, 70) -- Position below the selector
+-- Parented to Frame to avoid clipping issues with ManualTeleportFrame's ClipsDescendants
+TeleportDropdownOptionsFrame.Parent = Frame
+TeleportDropdownOptionsFrame.Size = UDim2.new(0, ManualTeleportFrame.Size.X.Offset - 20, 0, 100) -- Initial size, will expand
 TeleportDropdownOptionsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 TeleportDropdownOptionsFrame.BorderSizePixel = 1
 TeleportDropdownOptionsFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
-TeleportDropdownOptionsFrame.ZIndex = 3 -- Higher ZIndex to appear above other elements
+TeleportDropdownOptionsFrame.ZIndex = 5 -- Higher ZIndex to appear above all
 TeleportDropdownOptionsFrame.Visible = false -- Hidden by default
 TeleportDropdownOptionsFrame.ScrollBarThickness = 6
 TeleportDropdownOptionsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Automatically adjust canvas height
@@ -710,16 +710,23 @@ local function populateDropdownOptions()
         end)
     end
     -- Adjust the height of the dropdown options frame based on content
-    TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, math.min(150, #sortedLocations * (optionHeight + UIListLayout.Padding.Offset)))
+    TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0, 0, 0, #sortedLocations * (optionHeight + UIListLayout.Padding.Offset))
+    TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, math.min(150, TeleportDropdownOptionsFrame.CanvasSize.Y.Offset))
 end
 
-TeleportLocationSelector.MouseButton1Click:Connect(function() -- Changed from TeleportDropdownDisplay
+TeleportLocationSelector.MouseButton1Click:Connect(function()
     if TeleportDropdownOptionsFrame.Visible then
         TeleportDropdownOptionsFrame.Visible = false
         -- Reset button position when closing dropdown
         TeleportButton.Position = UDim2.new(0, 10, 0, 80)
     else
         populateDropdownOptions()
+        -- Calculate position relative to the selector's absolute position
+        local selectorAbsolutePos = TeleportLocationSelector.AbsolutePosition
+        local frameAbsolutePos = Frame.AbsolutePosition
+        local relativeX = selectorAbsolutePos.X - frameAbsolutePos.X
+        local relativeY = selectorAbsolutePos.Y - frameAbsolutePos.Y + TeleportLocationSelector.Size.Y.Offset + 5 -- 5 for padding
+        TeleportDropdownOptionsFrame.Position = UDim2.new(0, relativeX, 0, relativeY)
         TeleportDropdownOptionsFrame.Visible = true
         -- Move the Teleport button down to make space for the dropdown
         TeleportButton.Position = UDim2.new(0, 10, 0, 80 + TeleportDropdownOptionsFrame.Size.Y.Offset + 5)
@@ -731,7 +738,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
         local mousePos = UserInputService:GetMouseLocation()
         local dropdownBounds = TeleportDropdownOptionsFrame.AbsolutePosition + TeleportDropdownOptionsFrame.AbsoluteSize
-        local selectorBounds = TeleportLocationSelector.AbsolutePosition + TeleportLocationSelector.AbsoluteSize -- Changed to selector
+        local selectorBounds = TeleportLocationSelector.AbsolutePosition + TeleportLocationSelector.AbsoluteSize
 
         local isClickInsideDropdown = mousePos.X >= TeleportDropdownOptionsFrame.AbsolutePosition.X and
                                      mousePos.X <= dropdownBounds.X and
@@ -753,7 +760,7 @@ end)
 
 TeleportButton.MouseButton1Click:Connect(function()
     scriptRunning = true -- Pastikan scriptRunning aktif saat UI digunakan
-    local selectedLocation = TeleportLocationSelector.Text -- Changed from TeleportDropdownDisplay
+    local selectedLocation = TeleportLocationSelector.Text
     local cframe = teleportLocations[selectedLocation]
     if cframe then
         teleportPlayer(cframe, selectedLocation)
@@ -774,43 +781,50 @@ end)
 -- --- ANIMASI UI ---
 -- Menggunakan task.spawn() untuk memastikan animasi berjalan di thread terpisah.
 
-task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Background)
+task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
     if not Frame or not Frame.Parent then return end
     local baseColor = Color3.fromRGB(15, 15, 20)
     local glitchColor1 = Color3.fromRGB(25, 20, 30)
     local glitchColor2 = Color3.fromRGB(10, 10, 15)
     local borderBase = Color3.fromRGB(255,0,0)
     local borderGlitch = Color3.fromRGB(0,255,255)
+    local borderThicknessBase = 2
 
     while ScreenGui and ScreenGui.Parent do
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             local r = math.random()
-            if r < 0.05 then -- Glitch intens
+            if r < 0.08 then -- Glitch intens (lebih sering)
                 Frame.BackgroundColor3 = glitchColor1
-                Frame.BorderColor3 = borderGlitch
+                Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255)) -- Warna acak
+                Frame.BorderSizePixel = math.random(3, 7) -- Ketebalan acak
                 task.wait(0.05)
                 Frame.BackgroundColor3 = glitchColor2
+                Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
+                Frame.BorderSizePixel = math.random(1, 5)
                 task.wait(0.05)
-            elseif r < 0.2 then -- Glitch ringan
+            elseif r < 0.3 then -- Glitch ringan (lebih sering)
                 Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random())
-                Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.5)
+                Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.8)
+                Frame.BorderSizePixel = math.random(2, 4)
                 task.wait(0.1)
             else
                 Frame.BackgroundColor3 = baseColor
                 Frame.BorderColor3 = borderBase
+                Frame.BorderSizePixel = borderThicknessBase
             end
-            -- Animasi border utama (HSV shift)
+            -- Animasi border utama (HSV shift) yang lebih halus saat tidak glitch intens
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
             Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v)
         else -- Jika diminimize, pastikan warna kembali normal untuk 'Z'
             Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
+            Frame.BorderSizePixel = borderThicknessBase
         end
         task.wait(0.05)
     end
 end)
 
-task.spawn(function() -- Animasi UiTitleLabel (Glitch Text Transition)
+task.spawn(function() -- Animasi UiTitleLabel (Glitch Text Transition dan RGB Normal)
     if not UiTitleLabel or not UiTitleLabel.Parent then return end
     local originalText1 = "ANTARCTIC TELEPORT"
     local originalText2 = "ZEDLIST X ZXHELL"
@@ -859,9 +873,14 @@ task.spawn(function() -- Animasi UiTitleLabel (Glitch Text Transition)
                 task.wait(0.05)
             end
 
-            -- Display target text normally
+            -- Display target text normally with RGB animation
             UiTitleLabel.Text = currentTargetText
-            UiTitleLabel.TextColor3 = baseColor
+            local hue = (tick()*0.1) % 1 -- RGB animation for normal text
+            local r_rgb, g_rgb, b_rgb = Color3.fromHSV(hue, 1, 1).R, Color3.fromHSV(hue, 1, 1).G, Color3.fromHSV(hue, 1, 1).B
+            r_rgb = math.min(1, r_rgb + 0.6) -- Dominasi merah
+            g_rgb = g_rgb * 0.4
+            b_rgb = b_rgb * 0.4
+            UiTitleLabel.TextColor3 = Color3.new(r_rgb, g_rgb, b_rgb)
             UiTitleLabel.TextStrokeTransparency = 0.5
             UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
             UiTitleLabel.Position = originalPos
@@ -877,7 +896,7 @@ task.spawn(function() -- Animasi UiTitleLabel (Glitch Text Transition)
                 currentTargetText = originalText1
             end
         else
-            -- If minimized, ensure it shows originalText1 without glitch
+            -- If minimized, ensure it shows originalText1 without glitch, no RGB animation
             UiTitleLabel.Text = originalText1
             UiTitleLabel.TextColor3 = baseColor
             UiTitleLabel.TextStrokeTransparency = 0.5
@@ -891,7 +910,7 @@ end)
 
 
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
-    local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton, TeleportButton, TeleportLocationSelector} -- Added TeleportLocationSelector
+    local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton, TeleportButton, TeleportLocationSelector}
     while ScreenGui and ScreenGui.Parent do
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             for _, btn in ipairs(buttonsToAnimate) do
