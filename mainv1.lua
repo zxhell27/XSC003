@@ -33,24 +33,24 @@ local timerInputElements = {}
 
 -- --- Variabel Kontrol dan State ---
 local scriptRunning = false
-local stopUpdateQi = false -- Tidak digunakan dalam skrip ekspedisi ini, tapi dipertahankan dari mainv2
-local pauseUpdateQiTemporarily = false -- Tidak digunakan dalam skrip ekspedisi ini, tapi dipertahankan dari mainv2
+local stopUpdateQi = false -- Not used in this expedition script, but retained from mainv2
+local pauseUpdateQiTemporarily = false -- Not used in this expedition script, but retained from mainv2
 local mainCycleThread = nil
-local aptitudeMineThread = nil -- Tidak digunakan dalam skrip ekspedisi ini, tapi dipertahankan dari mainv2
-local updateQiThread = nil -- Tidak digunakan dalam skrip ekspedisi ini, tapi dipertahankan dari mainv2
-local waterDrinkThread = nil -- Thread baru untuk minum air
+local aptitudeMineThread = nil -- Not used in this expedition script, but retained from mainv2
+local updateQiThread = nil -- Not used in this expedition script, but retained from mainv2
+local waterDrinkThread = nil -- New thread for drinking water
 
 local isMinimized = false
-local originalFrameSize = UDim2.new(0, 260, 0, 420) -- Ukuran awal UI lebih kecil
-local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
-local minimizedZLabel = Instance.new("TextLabel") -- Label khusus untuk pop-up 'Z'
+local originalFrameSize = UDim2.new(0, 260, 0, 420) -- Initial UI size, smaller
+local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- 'Z' pop-up size
+local minimizedZLabel = Instance.new("TextLabel") -- Special label for 'Z' pop-up
 
--- Kumpulan elemen yang visibilitasnya akan di-toggle
-local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibuat
+-- Collection of elements whose visibility will be toggled
+local elementsToToggleVisibility = {} -- Will be populated after all UI elements are created
 
--- --- Tabel Konfigurasi Timer ---
+-- --- Timer Configuration Table ---
 local timers = {
-    -- Timers dari mainv2 (dipertahankan, tapi tidak digunakan dalam logika ekspedisi ini)
+    -- Timers from mainv2 (retained, but not used in this expedition logic)
     wait_1m30s_after_first_items = 90,
     alur_wait_40s_hide_qi = 40,
     comprehend_duration = 20,
@@ -67,15 +67,15 @@ local timers = {
     changeMapDelay = 0.5,
     fireserver_generic_delay = 0.25,
 
-    -- Timers baru untuk ekspedisi
-    initialWaitBeforeTeleport = 5, -- Tunggu 5 detik sebelum teleport pertama
-    teleportWait = 5,             -- Tunggu 5 detik setelah setiap teleport
-    longWaitBeforeCheckpoint = 300, -- Tunggu 5 menit (300 detik) sebelum setiap checkpoint
-    waterDrinkInterval = 420,     -- Minum air setiap 7 menit (420 detik)
-    cycleRestartDelay = 2,        -- Penundaan kecil sebelum mengulang siklus ekspedisi
+    -- New timers for expedition
+    initialWaitBeforeTeleport = 5, -- Wait 5 seconds before first teleport
+    teleportWait = 5,             -- Wait 5 seconds after each teleport
+    longWaitBeforeCheckpoint = 300, -- Wait 5 minutes (300 seconds) before each checkpoint
+    waterDrinkInterval = 420,     -- Drink water every 7 minutes (420 seconds)
+    cycleRestartDelay = 2,        -- Small delay before restarting the expedition cycle
 }
 
--- // Parent UI ke player //
+-- // Parent UI to player //
 local function setupCoreGuiParenting()
     local coreGuiService = game:GetService("CoreGui")
     if not ScreenGui.Parent or ScreenGui.Parent ~= coreGuiService then
@@ -84,60 +84,60 @@ local function setupCoreGuiParenting()
     if not Frame.Parent or Frame.Parent ~= ScreenGui then
         Frame.Parent = ScreenGui
     end
-    -- Pastikan semua elemen UI diparenting di sini
+    -- Ensure all UI elements are parented here
     UiTitleLabel.Parent = Frame
     StartButton.Parent = Frame
     StatusLabel.Parent = Frame
     MinimizeButton.Parent = Frame
     TimerTitleLabel.Parent = Frame
     ApplyTimersButton.Parent = Frame
-    minimizedZLabel.Parent = Frame -- Parentkan label Z ke Frame
+    minimizedZLabel.Parent = Frame -- Parent the Z label to the Frame
 end
 
--- Panggil setupCoreGuiParenting di awal
+-- Call setupCoreGuiParenting at the beginning
 setupCoreGuiParenting()
 
--- // Desain UI //
+-- // UI Design //
 
--- --- Frame Utama ---
+-- --- Main Frame ---
 Frame.Size = originalFrameSize
-Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Tengah layar
-Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20) -- Latar belakang gelap kebiruan
+Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Center of screen
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20) -- Dark bluish background
 Frame.Active = true
 Frame.Draggable = true
 Frame.BorderSizePixel = 2
-Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Awalnya merah, akan dianimasikan
-Frame.ClipsDescendants = true -- Penting untuk animasi masuk/keluar elemen
+Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Initially red, will be animated
+Frame.ClipsDescendants = true -- Important for element entry/exit animations
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10) -- Sudut lebih membulat
+UICorner.CornerRadius = UDim.new(0, 10) -- More rounded corners
 UICorner.Parent = Frame
 
--- --- Nama UI Label ("ZXHELL X ZEDLIST") ---
-UiTitleLabel.Size = UDim2.new(1, -20, 0, 35) -- Lebih kecil sedikit
+-- --- UI Name Label ("ROBLOX EXPEDITION") ---
+UiTitleLabel.Size = UDim2.new(1, -20, 0, 35) -- Slightly smaller
 UiTitleLabel.Position = UDim2.new(0, 10, 0, 10)
 UiTitleLabel.Font = Enum.Font.SourceSansSemibold
-UiTitleLabel.Text = "ROBLOX EXPEDITION" -- Diubah untuk ekspedisi
+UiTitleLabel.Text = "ROBLOX EXPEDITION" -- Changed for expedition
 UiTitleLabel.TextColor3 = Color3.fromRGB(255, 25, 25)
 UiTitleLabel.TextScaled = false
-UiTitleLabel.TextSize = 24 -- Ukuran font sedang
+UiTitleLabel.TextSize = 24 -- Medium font size
 UiTitleLabel.TextXAlignment = Enum.TextXAlignment.Center
 UiTitleLabel.BackgroundTransparency = 1
 UiTitleLabel.ZIndex = 2
 UiTitleLabel.TextStrokeTransparency = 0.5
 UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
 
--- Posisi elemen lain disesuaikan dengan layout baru
-local yOffsetForTitle = 50 -- Jarak dari atas frame ke elemen berikutnya (disesuaikan)
+-- Position of other elements adjusted for new layout
+local yOffsetForTitle = 50 -- Distance from top of frame to next element (adjusted)
 
--- --- Tombol Start/Stop ---
-StartButton.Size = UDim2.new(1, -40, 0, 35) -- Lebih kecil
+-- --- Start/Stop Button ---
+StartButton.Size = UDim2.new(1, -40, 0, 35) -- Smaller
 StartButton.Position = UDim2.new(0, 20, 0, yOffsetForTitle)
-StartButton.Text = "START EXPEDITION" -- Diubah
+StartButton.Text = "START EXPEDITION" -- Changed
 StartButton.Font = Enum.Font.SourceSansBold
-StartButton.TextSize = 16 -- Ukuran font sedang
+StartButton.TextSize = 16 -- Medium font size
 StartButton.TextColor3 = Color3.fromRGB(220, 220, 220)
-StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20) -- Merah gelap
+StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20) -- Dark red
 StartButton.BorderSizePixel = 1
 StartButton.BorderColor3 = Color3.fromRGB(255, 50, 50)
 StartButton.ZIndex = 2
@@ -147,13 +147,13 @@ StartButtonCorner.CornerRadius = UDim.new(0, 5)
 StartButtonCorner.Parent = StartButton
 
 -- --- Status Label ---
-StatusLabel.Size = UDim2.new(1, -40, 0, 45) -- Lebih kecil
+StatusLabel.Size = UDim2.new(1, -40, 0, 45) -- Smaller
 StatusLabel.Position = UDim2.new(0, 20, 0, yOffsetForTitle + 45)
 StatusLabel.Text = "STATUS: STANDBY"
 StatusLabel.Font = Enum.Font.SourceSansLight
-StatusLabel.TextSize = 14 -- Ukuran font sedang
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 220) -- Putih kebiruan
-StatusLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 30) -- Gelap
+StatusLabel.TextSize = 14 -- Medium font size
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 220) -- Bluish white
+StatusLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 30) -- Dark
 StatusLabel.TextWrapped = true
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 StatusLabel.BorderSizePixel = 0
@@ -163,15 +163,15 @@ local StatusLabelCorner = Instance.new("UICorner")
 StatusLabelCorner.CornerRadius = UDim.new(0, 5)
 StatusLabelCorner.Parent = StatusLabel
 
-local yOffsetForTimers = yOffsetForTitle + 100 -- Disesuaikan
+local yOffsetForTimers = yOffsetForTitle + 100 -- Adjusted
 
--- --- Konfigurasi Timer UI ---
-TimerTitleLabel.Size = UDim2.new(1, -40, 0, 20) -- Lebih kecil
+-- --- Timer Configuration UI ---
+TimerTitleLabel.Size = UDim2.new(1, -40, 0, 20) -- Smaller
 TimerTitleLabel.Position = UDim2.new(0, 20, 0, yOffsetForTimers)
-TimerTitleLabel.Text = "// EXPEDITION TIMER CONFIGURATION" -- Diubah
+TimerTitleLabel.Text = "// EXPEDITION TIMER CONFIGURATION" -- Changed
 TimerTitleLabel.Font = Enum.Font.Code
-TimerTitleLabel.TextSize = 14 -- Ukuran font sedang
-TimerTitleLabel.TextColor3 = Color3.fromRGB(255, 80, 80) -- Merah terang
+TimerTitleLabel.TextSize = 14 -- Medium font size
+TimerTitleLabel.TextColor3 = Color3.fromRGB(255, 80, 80) -- Bright red
 TimerTitleLabel.BackgroundTransparency = 1
 TimerTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TimerTitleLabel.ZIndex = 2
@@ -180,11 +180,11 @@ local function createTimerInput(name, yPos, labelText, initialValue)
     local label = Instance.new("TextLabel")
     label.Name = name .. "Label"
     label.Parent = Frame
-    label.Size = UDim2.new(0.55, -25, 0, 20) -- Lebih kecil
+    label.Size = UDim2.new(0.55, -25, 0, 20) -- Smaller
     label.Position = UDim2.new(0, 20, 0, yPos + yOffsetForTimers)
     label.Text = labelText .. ":"
     label.Font = Enum.Font.SourceSans
-    label.TextSize = 12 -- Ukuran font sedang
+    label.TextSize = 12 -- Medium font size
     label.TextColor3 = Color3.fromRGB(180, 180, 200)
     label.BackgroundTransparency = 1
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -194,12 +194,12 @@ local function createTimerInput(name, yPos, labelText, initialValue)
     local input = Instance.new("TextBox")
     input.Name = name .. "Input"
     input.Parent = Frame
-    input.Size = UDim2.new(0.45, -25, 0, 20) -- Lebih kecil
+    input.Size = UDim2.new(0.45, -25, 0, 20) -- Smaller
     input.Position = UDim2.new(0.55, 5, 0, yPos + yOffsetForTimers)
     input.Text = tostring(initialValue)
     input.PlaceholderText = "sec"
     input.Font = Enum.Font.SourceSansSemibold
-    input.TextSize = 12 -- Ukuran font sedang
+    input.TextSize = 12 -- Medium font size
     input.TextColor3 = Color3.fromRGB(255, 255, 255)
     input.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     input.ClearTextOnFocus = false
@@ -215,8 +215,8 @@ local function createTimerInput(name, yPos, labelText, initialValue)
     return input
 end
 
-local currentYConfig = 30 -- Jarak dari TimerTitleLabel (disesuaikan)
--- Inisialisasi nilai input timer dari tabel timers (hanya yang relevan untuk ekspedisi)
+local currentYConfig = 30 -- Distance from TimerTitleLabel (adjusted)
+-- Initialize timer input values from the timers table (only those relevant for expedition)
 timerInputElements.initialWaitInput = createTimerInput("InitialWait", currentYConfig, "INITIAL_WAIT", timers.initialWaitBeforeTeleport)
 currentYConfig = currentYConfig + 25
 timerInputElements.teleportWaitInput = createTimerInput("TeleportWait", currentYConfig, "TELEPORT_DELAY", timers.teleportWait)
@@ -224,15 +224,15 @@ currentYConfig = currentYConfig + 25
 timerInputElements.longWaitInput = createTimerInput("LongWait", currentYConfig, "CHECKPOINT_WAIT", timers.longWaitBeforeCheckpoint)
 currentYConfig = currentYConfig + 25
 timerInputElements.waterDrinkInput = createTimerInput("WaterDrink", currentYConfig, "WATER_DRINK_INTERVAL", timers.waterDrinkInterval)
-currentYConfig = currentYConfig + 35 -- Disesuaikan
+currentYConfig = currentYConfig + 35 -- Adjusted
 
-ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30) -- Lebih kecil
+ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30) -- Smaller
 ApplyTimersButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers)
 ApplyTimersButton.Text = "APPLY_TIMERS"
 ApplyTimersButton.Font = Enum.Font.SourceSansBold
-ApplyTimersButton.TextSize = 14 -- Ukuran font sedang
+ApplyTimersButton.TextSize = 14 -- Medium font size
 ApplyTimersButton.TextColor3 = Color3.fromRGB(220, 220, 220)
-ApplyTimersButton.BackgroundColor3 = Color3.fromRGB(30, 80, 30) -- Hijau gelap
+ApplyTimersButton.BackgroundColor3 = Color3.fromRGB(30, 80, 30) -- Dark green
 ApplyTimersButton.BorderColor3 = Color3.fromRGB(80, 255, 80)
 ApplyTimersButton.BorderSizePixel = 1
 ApplyTimersButton.ZIndex = 2
@@ -241,10 +241,10 @@ local ApplyButtonCorner = Instance.new("UICorner")
 ApplyButtonCorner.CornerRadius = UDim.new(0, 5)
 ApplyButtonCorner.Parent = ApplyTimersButton
 
--- --- Tombol Minimize ---
+-- --- Minimize Button ---
 MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
 MinimizeButton.Position = UDim2.new(1, -35, 0, 10)
-MinimizeButton.Text = "_" -- Simbol minimize
+MinimizeButton.Text = "_" -- Minimize symbol
 MinimizeButton.Font = Enum.Font.SourceSansBold
 MinimizeButton.TextSize = 20
 MinimizeButton.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -257,36 +257,36 @@ local MinimizeButtonCorner = Instance.new("UICorner")
 MinimizeButtonCorner.CornerRadius = UDim.new(0, 3)
 MinimizeButtonCorner.Parent = MinimizeButton
 
--- --- Pop-up 'Z' (Baru) ---
-minimizedZLabel.Size = UDim2.new(1, 0, 1, 0) -- Akan mengisi seluruh Frame saat minimized
+-- --- 'Z' Pop-up (New) ---
+minimizedZLabel.Size = UDim2.new(1, 0, 1, 0) -- Will fill the entire Frame when minimized
 minimizedZLabel.Position = UDim2.new(0,0,0,0)
 minimizedZLabel.Text = "Z"
 minimizedZLabel.Font = Enum.Font.SourceSansBold
 minimizedZLabel.TextScaled = false
-minimizedZLabel.TextSize = 40 -- Ukuran besar agar memenuhi pop-up kecil
-minimizedZLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- Merah
+minimizedZLabel.TextSize = 40 -- Large size to fill small pop-up
+minimizedZLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- Red
 minimizedZLabel.TextXAlignment = Enum.TextXAlignment.Center
 minimizedZLabel.TextYAlignment = Enum.TextYAlignment.Center
 minimizedZLabel.BackgroundTransparency = 1
-minimizedZLabel.ZIndex = 4 -- Pastikan di atas semua
-minimizedZLabel.Visible = false -- Awalnya sembunyi
+minimizedZLabel.ZIndex = 4 -- Ensure it's on top of everything
+minimizedZLabel.Visible = false -- Initially hidden
 
--- Kumpulan elemen yang visibilitasnya akan di-toggle
+-- Collection of elements whose visibility will be toggled
 elementsToToggleVisibility = {
     UiTitleLabel, StartButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
     timerInputElements.initialWaitLabel, timerInputElements.initialWaitInput,
     timerInputElements.teleportWaitLabel, timerInputElements.teleportWaitInput,
     timerInputElements.longWaitLabel, timerInputElements.longWaitInput,
     timerInputElements.waterDrinkLabel, timerInputElements.waterDrinkInput,
-    MinimizeButton -- Sertakan MinimizeButton di sini untuk menyembunyikannya saat mode 'Z'
+    MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
 }
 
--- // Fungsi Bantu UI //
+-- // UI Helper Functions //
 local function updateStatus(text)
     if StatusLabel and StatusLabel.Parent then StatusLabel.Text = "STATUS: " .. string.upper(text) end
 end
 
--- // Fungsi Animasi UI //
+-- // UI Animation Functions //
 local TweenService = game:GetService("TweenService")
 local function animateFrame(targetSize, targetPosition, callback)
     local info = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -299,50 +299,50 @@ local function animateFrame(targetSize, targetPosition, callback)
     end
 end
 
--- // Fungsi Minimize/Maximize UI //
+-- // Minimize/Maximize UI Function //
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
-        -- Simpan posisi original Frame sebelum diubah
+        -- Save original Frame position before changing
         local originalFramePosition = Frame.Position
 
-        -- Sembunyikan semua elemen kecuali Frame dan 'Z' label
+        -- Hide all elements except Frame and 'Z' label
         for _, element in ipairs(elementsToToggleVisibility) do
             if element and element.Parent then element.Visible = false end
         end
-        minimizedZLabel.Visible = true -- Tampilkan 'Z'
+        minimizedZLabel.Visible = true -- Show 'Z'
 
-        -- Hitung posisi target pop-up di pojok kanan bawah
-        local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02 -- Sedikit dari kanan
-        local targetY = 1 - (minimizedFrameSize.Y.Offset / ScreenGui.AbsoluteSize.Y) - 0.02 -- Sedikit dari bawah
+        -- Calculate target pop-up position in bottom right corner
+        local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02 -- Slightly from right
+        local targetY = 1 - (minimizedFrameSize.Y.Offset / ScreenGui.AbsoluteSize.Y) - 0.02 -- Slightly from bottom
         local targetPosition = UDim2.new(targetX, 0, targetY, 0)
 
         animateFrame(minimizedFrameSize, targetPosition)
-        Frame.Draggable = false -- Matikan draggable saat diminimize untuk mencegah pergeseran
+        Frame.Draggable = false -- Disable draggable when minimized to prevent shifting
     else
-        -- Tampilkan tombol minimize sebelum animasi maximize dimulai
+        -- Show minimize button before maximize animation starts
         for _, element in ipairs(elementsToToggleVisibility) do
             if element == MinimizeButton and element.Parent then element.Visible = true end
         end
 
-        minimizedZLabel.Visible = false -- Sembunyikan 'Z'
-        MinimizeButton.Text = "_" -- Kembali ke simbol minimize
+        minimizedZLabel.Visible = false -- Hide 'Z'
+        MinimizeButton.Text = "_" -- Revert to minimize symbol
 
-        -- Posisikan kembali ke tengah layar (gunakan originalFrameSize untuk posisi yang benar)
+        -- Reposition to center of screen (use originalFrameSize for correct position)
         local targetPosition = UDim2.new(0.5, -originalFrameSize.X.Offset/2, 0.5, -originalFrameSize.Y.Offset/2)
         animateFrame(originalFrameSize, targetPosition, function()
-            -- Tampilkan semua elemen setelah animasi ukuran selesai
+            -- Show all elements after size animation completes
             for _, element in ipairs(elementsToToggleVisibility) do
                 if element and element.Parent then element.Visible = true end
             end
-            Frame.Draggable = true -- Aktifkan kembali draggable setelah maximize
+            Frame.Draggable = true -- Re-enable draggable after maximize
         end)
     end
 end
 
 MinimizeButton.MouseButton1Click:Connect(toggleMinimize)
 
--- // Fungsi tunggu //
+-- // Wait Function //
 local function waitSeconds(sec)
     if sec <= 0 then task.wait() return end
     local startTime = tick()
@@ -351,7 +351,7 @@ local function waitSeconds(sec)
     until not scriptRunning or tick() - startTime >= sec
 end
 
--- Fungsi fireRemoteEnhanced (dipertahankan dari mainv2, tidak digunakan untuk ekspedisi ini)
+-- fireRemoteEnhanced Function (retained from mainv2, not used for this expedition)
 local function fireRemoteEnhanced(remoteName, pathType, ...)
     local argsToUnpack = table.pack(...)
     local remoteEventFolder
@@ -376,37 +376,37 @@ local function fireRemoteEnhanced(remoteName, pathType, ...)
     return success
 end
 
--- // Fungsi untuk menemukan part dari string path //
--- Ini akan mengurai string seperti 'workspace["Folder%"].Part' atau 'workspace.Folder.Part'
+-- // Function to find part from path string //
+-- This will parse strings like 'workspace["Folder%"].Part' or 'workspace.Folder.Part'
 local function findPartFromPathString(pathString)
     local currentInstance = game:GetService("Workspace")
-    -- Hapus "workspace" prefix jika ada, dan tangani spasi/titik di awal/akhir
+    -- Remove "workspace" prefix if present, and handle leading/trailing spaces/dots
     local cleanPath = pathString:gsub("^%s*workspace%s*%.?%s*", ""):gsub("%s*$", "")
 
-    -- Pisahkan path menjadi komponen, tangani notasi titik dan kurung siku
+    -- Split path into components, handle dot and bracket notation
     local pathComponents = {}
     local cursor = 1
     while cursor <= #cleanPath do
         local char = cleanPath:sub(cursor, cursor)
         if char == '[' then
-            -- Tangani akses kurung siku, misal ["Nama%"]
-            local closingQuote = cleanPath:find('"', cursor + 2) -- Cari kutip penutup setelah ["
-            local closingBracket = cleanPath:find(']', closingQuote + 1) -- Cari kurung siku penutup setelah kutip
+            -- Handle bracket access, e.g., ["Name%"]
+            local closingQuote = cleanPath:find('"', cursor + 2) -- Find closing quote after ["
+            local closingBracket = cleanPath:find(']', closingQuote + 1) -- Find closing bracket after quote
             if closingQuote and closingBracket then
-                local nameStart = cursor + 2 -- Lewati ['"
-                local nameEnd = closingQuote - 1 -- Sebelum "]
+                local nameStart = cursor + 2 -- Skip ['"
+                local nameEnd = closingQuote - 1 -- Before "]
                 local name = cleanPath:sub(nameStart, nameEnd)
                 table.insert(pathComponents, name)
-                cursor = closingBracket + 1 -- Lewati "]
+                cursor = closingBracket + 1 -- Skip "]
             else
                 warn("Malformed path string (unclosed bracket or quote): " .. pathString)
                 return nil
             end
         elseif char == '.' then
-            -- Lewati titik
+            -- Skip dot
             cursor = cursor + 1
         else
-            -- Tangani nama biasa (alfanumerik, underscore)
+            -- Handle regular name (alphanumeric, underscore)
             local nextSpecialChar = cleanPath:find('[%.%[]', cursor)
             local name
             if nextSpecialChar then
@@ -424,24 +424,24 @@ local function findPartFromPathString(pathString)
         if currentInstance then
             currentInstance = currentInstance:FindFirstChild(name)
         else
-            return nil -- Path rusak, part tidak ditemukan
+            return nil -- Path broken, part not found
         end
     end
     return currentInstance
 end
 
--- // Fungsi bantu untuk ekspedisi //
+-- // Helper function for expedition //
 local function teleportTo(targetPart)
     if not scriptRunning then return false end
     local player = game:GetService("Players").LocalPlayer
     local character = player.Character
     if not character then
-        -- Tunggu hingga karakter dimuat jika belum ada
+        -- Wait until character is loaded if not already present
         character = player.CharacterAdded:Wait()
     end
 
     if not character then
-        warn("Karakter tidak ditemukan setelah menunggu.")
+        warn("Character not found after waiting.")
         updateStatus("ERR: NO_CHARACTER_FOR_TP")
         return false
     end
@@ -449,7 +449,7 @@ local function teleportTo(targetPart)
     local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
 
     if not humanoidRootPart then
-        warn("HumanoidRootPart tidak ditemukan untuk teleportasi.")
+        warn("HumanoidRootPart not found for teleportation.")
         updateStatus("ERR: NO_HRP_FOR_TP")
         return false
     end
@@ -457,28 +457,28 @@ local function teleportTo(targetPart)
     if targetPart and targetPart:IsA("BasePart") then
         updateStatus("TELEPORTING TO: " .. targetPart.Name)
         local success, err = pcall(function()
-            -- Metode teleportasi umum: mengatur CFrame dari HumanoidRootPart
-            humanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0) -- Tambah sedikit offset Y agar tidak terjebak
-            -- Opsional: Set Velocity ke Vector3.new(0,0,0) untuk mencegah pergerakan setelah teleport
+            -- Common teleportation method: setting CFrame of HumanoidRootPart
+            humanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0) -- Add a small Y offset to prevent getting stuck
+            -- Optional: Set Velocity to Vector3.new(0,0,0) to prevent movement after teleport
             if character:FindFirstChildOfClass("Humanoid") then
-                character:FindFirstChildOfClass("Humanoid").WalkSpeed = 0 -- Hentikan pergerakan sementara
+                character:FindFirstChildOfClass("Humanoid").WalkSpeed = 0 -- Stop movement temporarily
                 character:FindFirstChildOfClass("Humanoid").JumpPower = 0
             end
         end)
         if not success then
-            warn("Gagal melakukan teleportasi: " .. err)
+            warn("Failed to teleport: " .. err)
             updateStatus("ERR: TP_FAILED")
             return false
         end
         waitSeconds(timers.teleportWait)
-        -- Kembalikan kecepatan setelah teleport
+        -- Restore speed after teleport
         if character:FindFirstChildOfClass("Humanoid") then
-            character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16 -- Kecepatan default Roblox
-            character:FindFirstChildOfClass("Humanoid").JumpPower = 50 -- JumpPower default Roblox
+            character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16 -- Default Roblox speed
+            character:FindFirstChildOfClass("Humanoid").JumpPower = 50 -- Default Roblox JumpPower
         end
         return true
     else
-        warn("Target teleportasi tidak valid atau tidak ditemukan: " .. tostring(targetPart))
+        warn("Invalid or not found teleport target: " .. tostring(targetPart))
         updateStatus("ERR: INVALID_TP_TARGET")
         return false
     end
@@ -488,7 +488,7 @@ local function drinkWater()
     if not scriptRunning then return false end
     local player = game:GetService("Players").LocalPlayer
     local character = player.Character
-    if not character then return false end -- Karakter mungkin belum dimuat atau hilang
+    if not character then return false end -- Character might not be loaded or lost
 
     updateStatus("DRINKING WATER...")
     local waterBottle = character:FindFirstChild("Water Bottle")
@@ -499,113 +499,113 @@ local function drinkWater()
                 remoteEvent:FireServer()
             end)
             if not success then
-                warn("Gagal memanggil RemoteEvent Water Bottle: " .. err)
+                warn("Failed to call Water Bottle RemoteEvent: " .. err)
                 updateStatus("ERR: WATER_FIRE_FAIL")
             end
             return success
         else
-            warn("RemoteEvent tidak ditemukan di Water Bottle.")
+            warn("RemoteEvent not found in Water Bottle.")
             updateStatus("ERR: NO_WATER_RE")
             return false
         end
     else
-        warn("Water Bottle tidak ditemukan di karakter.")
+        warn("Water Bottle not found in character.")
         updateStatus("ERR: NO_WATER_BOTTLE")
         return false
     end
 end
 
--- // Fungsi utama ekspedisi //
+-- // Main expedition function //
 local function runExpeditionCycle()
     updateStatus("STARTING EXPEDITION...")
 
-    -- --- Siklus Ekspesisi Berulang (Dimulai dari "nomor 2" dari Alur Script) ---
+    -- --- Repeating Expedition Cycle (Starts from "number 2" of the Script Flow) ---
     while scriptRunning do
-        -- Langkah 2: Tunggu 5 detik kemudian teleport ke Camp1
-        -- Alur Script: Tunggu 5 detik kemudian teleport ke sini : workspace["Camp_Main_Tents%"].Camp1
+        -- Step 2: Wait 5 seconds then teleport to Camp1
+        -- Script Flow: Wait 5 seconds then teleport to here: workspace["Camp_Main_Tents%"].Camp1
         if not scriptRunning then break end
         updateStatus("WAIT 5S, TP TO CAMP1...")
         waitSeconds(timers.teleportWait)
         local camp1Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp1')
         if not teleportTo(camp1Part) then break end
 
-        -- Langkah 3: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 1
-        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[264]
-        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 1"].SpawnLocation
+        -- Step 3: Wait 5 minutes then teleport to this checkpoint: Checkpoint Camp 1
+        -- Script Flow: Wait 5 minutes then teleport to this checkpoint: workspace:GetChildren()[264]
+        -- Using the more specific path from the bottom of the script flow: workspace["Checkpoints%"]["Camp 1"].SpawnLocation
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP1...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
         local checkpointCamp1 = findPartFromPathString('workspace["Checkpoints%"]["Camp 1"].SpawnLocation')
         if not teleportTo(checkpointCamp1) then break end
 
-        -- Langkah 4: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp2
-        -- Alur Script: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini : workspace["Camp_Main_Tents%"].Camp2
+        -- Step 4: If checkpoint reached then wait 5 seconds then teleport here: Camp2
+        -- Script Flow: If checkpoint reached then wait 5 seconds then teleport here: workspace["Camp_Main_Tents%"].Camp2
         if not scriptRunning then break end
         updateStatus("CHECKPOINT CAMP1 REACHED, TP TO CAMP2...")
         waitSeconds(timers.teleportWait)
         local camp2Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp2')
         if not teleportTo(camp2Part) then break end
 
-        -- Langkah 5: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 2
-        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[731]
-        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 2"].SpawnLocation
+        -- Step 5: Wait 5 minutes then teleport to this checkpoint: Checkpoint Camp 2
+        -- Script Flow: Wait 5 minutes then teleport to this checkpoint: workspace:GetChildren()[731]
+        -- Using the more specific path from the bottom of the script flow: workspace["Checkpoints%"]["Camp 2"].SpawnLocation
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP2...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
         local checkpointCamp2 = findPartFromPathString('workspace["Checkpoints%"]["Camp 2"].SpawnLocation')
         if not teleportTo(checkpointCamp2) then break end
 
-        -- Langkah 6: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp3
-        -- Alur Script: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini : workspace["Camp_Main_Tents%"].Camp3
+        -- Step 6: If checkpoint reached then wait 5 seconds then teleport here: Camp3
+        -- Script Flow: If checkpoint reached then wait 5 seconds then teleport here: workspace["Camp_Main_Tents%"].Camp3
         if not scriptRunning then break end
         updateStatus("CHECKPOINT CAMP2 REACHED, TP TO CAMP3...")
         waitSeconds(timers.teleportWait)
         local camp3Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp3')
         if not teleportTo(camp3Part) then break end
 
-        -- Langkah 7: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 3
-        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[550]
-        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 3"].SpawnLocation
+        -- Step 7: Wait 5 minutes then teleport to this checkpoint: Checkpoint Camp 3
+        -- Script Flow: Wait 5 minutes then teleport to this checkpoint: workspace:GetChildren()[550]
+        -- Using the more specific path from the bottom of the script flow: workspace["Checkpoints%"]["Camp 3"].SpawnLocation
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP3...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
         local checkpointCamp3 = findPartFromPathString('workspace["Checkpoints%"]["Camp 3"].SpawnLocation')
         if not teleportTo(checkpointCamp3) then break end
 
-        -- Langkah 8: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp4
-        -- Alur Script: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini : workspace["Camp_Main_Tents%"].Camp4
+        -- Step 8: If checkpoint reached then wait 5 seconds then teleport here: Camp4
+        -- Script Flow: If checkpoint reached then wait 5 seconds then teleport here: workspace["Camp_Main_Tents%"].Camp4
         if not scriptRunning then break end
         updateStatus("CHECKPOINT CAMP3 REACHED, TP TO CAMP4...")
         waitSeconds(timers.teleportWait)
         local camp4Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp4')
         if not teleportTo(camp4Part) then break end
 
-        -- Langkah 9: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 4
-        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace.Checkpoint *camp 4*
-        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 4"].SpawnLocation
+        -- Step 9: Wait 5 minutes then teleport to this checkpoint: Checkpoint Camp 4
+        -- Script Flow: Wait 5 minutes then teleport to this checkpoint: workspace.Checkpoint *camp 4*
+        -- Using the more specific path from the bottom of the script flow: workspace["Checkpoints%"]["Camp 4"].SpawnLocation
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP4...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
         local checkpointCamp4 = findPartFromPathString('workspace["Checkpoints%"]["Camp 4"].SpawnLocation')
         if not teleportTo(checkpointCamp4) then break end
 
-        -- Langkah 10: Tunggu 5 menit kemudian teleport ke cek poin ini: South Pole SpawnLocation
-        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace["Checkpoints%"]["South Pole"].SpawnLocation
+        -- Step 10: Wait 5 minutes then teleport to this checkpoint: South Pole SpawnLocation
+        -- Script Flow: Wait 5 minutes then teleport to this checkpoint: workspace["Checkpoints%"]["South Pole"].SpawnLocation
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO SOUTH_POLE_SPAWN...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
         local southPoleSpawn = findPartFromPathString('workspace["Checkpoints%"]["South Pole"].SpawnLocation')
         if not teleportTo(southPoleSpawn) then break end
 
-        -- Langkah 11: Minum air setiap 7 menit (ditangani oleh waterDrinkThread terpisah)
-        -- Langkah ini tidak perlu diulang di sini karena sudah ada thread khusus.
+        -- Step 11: Drink water every 7 minutes (handled by separate waterDrinkThread)
+        -- This step does not need to be repeated here as there is a dedicated thread.
 
         updateStatus("EXPEDITION CYCLE COMPLETE. RESTARTING...")
-        waitSeconds(timers.cycleRestartDelay) -- Penundaan sebelum mengulang siklus
+        waitSeconds(timers.cycleRestartDelay) -- Delay before restarting the cycle
     end
 end
 
--- // Loop Latar Belakang (dipertahankan dari mainv2, tapi tidak digunakan untuk ekspedisi) //
+-- // Background Loops (retained from mainv2, but not used for this expedition) //
 local function increaseAptitudeMineLoop_enhanced()
     while scriptRunning do
         fireRemoteEnhanced("IncreaseAptitude", "Base", {})
@@ -622,7 +622,7 @@ local function updateQiLoop_enhanced()
     end
 end
 
--- Thread untuk minum air (dipisahkan agar berjalan secara paralel)
+-- Thread for drinking water (separated to run in parallel)
 local function waterDrinkLoop()
     while scriptRunning do
         drinkWater()
@@ -630,41 +630,27 @@ local function waterDrinkLoop()
     end
 end
 
--- Tombol Start
+-- Start Button
 StartButton.MouseButton1Click:Connect(function()
     scriptRunning = not scriptRunning
     if scriptRunning then
-        StartButton.Text = "EXPEDITION_ACTIVE" -- Diubah
-        StartButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30) -- Merah menyala
+        StartButton.Text = "EXPEDITION_ACTIVE" -- Changed
+        StartButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30) -- Bright red
         StartButton.TextColor3 = Color3.fromRGB(255,255,255)
         updateStatus("INIT EXPEDITION...")
 
-        -- Teleport awal ke Basecamp (Langkah 1 dari alur)
-        -- Alur Script: Tunggu 5 detik kemudian teleport ke ini : workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp
-        local basecampPart = findPartFromPathString('workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp')
-        if basecampPart then
-            updateStatus("INITIAL TP TO BASECAMP...")
-            teleportTo(basecampPart)
-            waitSeconds(timers.teleportWait) -- Tunggu 5 detik setelah teleport awal
-        else
-            warn("Basecamp part tidak ditemukan. Pastikan 'Search_And_Rescue%' dan 'Helicopter_Spawn_Clickers.Basecamp' ada.")
-            updateStatus("ERR: BASECAMP_NOT_FOUND")
-            scriptRunning = false
-            StartButton.Text = "START EXPEDITION"
-            StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
-            StartButton.TextColor3 = Color3.fromRGB(220,220,220)
-            return
-        end
+        -- Removed initial teleport to Basecamp as requested.
+        -- The runExpeditionCycle now directly starts with the Camp1 teleport.
 
         stopUpdateQi = false; pauseUpdateQiTemporarily = false
-        -- Thread yang tidak digunakan untuk ekspedisi ini (dipertahankan dari mainv2)
+        -- Threads not used for this expedition (retained from mainv2)
         if not aptitudeMineThread or coroutine.status(aptitudeMineThread) == "dead" then aptitudeMineThread = task.spawn(increaseAptitudeMineLoop_enhanced) end
         if not updateQiThread or coroutine.status(updateQiThread) == "dead" then updateQiThread = task.spawn(updateQiLoop_enhanced) end
 
-        -- Thread utama ekspedisi
+        -- Main expedition thread
         if not mainCycleThread or coroutine.status(mainCycleThread) == "dead" then
             mainCycleThread = task.spawn(function()
-                runExpeditionCycle() -- Panggil fungsi ekspedisi utama
+                runExpeditionCycle() -- Call the main expedition function
                 updateStatus("EXPEDITION_HALTED")
                 StartButton.Text = "START EXPEDITION"
                 StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
@@ -672,12 +658,12 @@ StartButton.MouseButton1Click:Connect(function()
             end)
         end
 
-        -- Thread untuk minum air
+        -- Thread for drinking water
         if not waterDrinkThread or coroutine.status(waterDrinkThread) == "dead" then waterDrinkThread = task.spawn(waterDrinkLoop) end
 
     else
         updateStatus("HALT_REQUESTED")
-        -- Hentikan semua thread saat skrip dihentikan
+        -- Stop all threads when the script is halted
         if mainCycleThread and coroutine.status(mainCycleThread) ~= "dead" then task.cancel(mainCycleThread); mainCycleThread = nil end
         if aptitudeMineThread and coroutine.status(aptitudeMineThread) ~= "dead" then task.cancel(aptitudeMineThread); aptitudeMineThread = nil end
         if updateQiThread and coroutine.status(updateQiThread) ~= "dead" then task.cancel(updateQiThread); updateQiThread = nil end
@@ -685,7 +671,7 @@ StartButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Tombol Apply Timers
+-- Apply Timers Button
 ApplyTimersButton.MouseButton1Click:Connect(function()
     local function applyTextInput(inputElement, timerKey, labelElement)
         local success = false; if not inputElement then return false end
@@ -697,7 +683,7 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
         return success
     end
     local allTimersValid = true
-    -- Hanya terapkan timer yang relevan dengan ekspedisi
+    -- Only apply timers relevant to the expedition
     allTimersValid = applyTextInput(timerInputElements.initialWaitInput, "initialWaitBeforeTeleport", timerInputElements.InitialWaitLabel) and allTimersValid
     allTimersValid = applyTextInput(timerInputElements.teleportWaitInput, "teleportWait", timerInputElements.TeleportWaitLabel) and allTimersValid
     allTimersValid = applyTextInput(timerInputElements.longWaitInput, "longWaitBeforeCheckpoint", timerInputElements.LongWaitLabel) and allTimersValid
@@ -706,7 +692,7 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
     if allTimersValid then updateStatus("TIMER_CONFIG_APPLIED") else updateStatus("ERR_TIMER_INPUT_INVALID") end
     task.wait(2)
-    -- Kembalikan warna label setelah 2 detik
+    -- Restore label colors after 2 seconds
     if timerInputElements.initialWaitLabel then pcall(function() timerInputElements.initialWaitLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     if timerInputElements.teleportWaitLabel then pcall(function() timerInputElements.teleportWaitLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     if timerInputElements.longWaitLabel then pcall(function() timerInputElements.longWaitLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
@@ -714,11 +700,11 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     updateStatus(originalStatus)
 end)
 
--- --- ANIMASI UI ---
--- Menggunakan task.spawn() untuk memastikan animasi berjalan di thread terpisah.
--- task.spawn() umumnya lebih andal dan direkomendasikan daripada spawn() lama.
+-- --- UI ANIMATIONS ---
+-- Using task.spawn() to ensure animations run in separate threads.
+-- task.spawn() is generally more reliable and recommended than the old spawn().
 
-task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Background)
+task.spawn(function() -- Frame Background Animation (Glitchy Background)
     if not Frame or not Frame.Parent then return end
     local baseColor = Color3.fromRGB(15, 15, 20)
     local glitchColor1 = Color3.fromRGB(25, 20, 30)
@@ -727,15 +713,15 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Background)
     local borderGlitch = Color3.fromRGB(0,255,255)
 
     while ScreenGui and ScreenGui.Parent do
-        if not isMinimized then -- Hanya beranimasi saat tidak diminimize
+        if not isMinimized then -- Only animate when not minimized
             local r = math.random()
-            if r < 0.05 then -- Glitch intens
+            if r < 0.05 then -- Intense glitch
                 Frame.BackgroundColor3 = glitchColor1
                 Frame.BorderColor3 = borderGlitch
                 task.wait(0.05)
                 Frame.BackgroundColor3 = glitchColor2
                 task.wait(0.05)
-            elseif r < 0.2 then -- Glitch ringan
+            elseif r < 0.2 then -- Light glitch
                 Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random())
                 Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.5)
                 task.wait(0.1)
@@ -743,18 +729,18 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Background)
                 Frame.BackgroundColor3 = baseColor
                 Frame.BorderColor3 = borderBase
             end
-            -- Animasi border utama (HSV shift)
+            -- Main border animation (HSV shift)
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
             Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v)
-        else -- Jika diminimize, pastikan warna kembali normal untuk 'Z'
+        else -- If minimized, ensure colors return to normal for 'Z'
             Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-            Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
+            Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Or any solid color you want for the pop-up
         end
         task.wait(0.05)
     end
 end)
 
-task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
+task.spawn(function() -- UiTitleLabel Animation (ZXHELL Glitch)
     if not UiTitleLabel or not UiTitleLabel.Parent then return end
     local originalText = UiTitleLabel.Text
     local glitchChars = {"@", "#", "$", "%", "&", "*", "!", "?", "/", "\\", "|", "_"}
@@ -762,11 +748,11 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
     local originalPos = UiTitleLabel.Position
 
     while ScreenGui and ScreenGui.Parent do
-        if not isMinimized then -- Hanya beranimasi saat tidak diminimize
+        if not isMinimized then -- Only animate when not minimized
             local r = math.random()
             local isGlitchingText = false
 
-            if r < 0.02 then -- Glitch Text Parah & Posisi
+            if r < 0.02 then -- Severe Text & Position Glitch
                 isGlitchingText = true
                 local newText = ""
                 for i = 1, #originalText do
@@ -781,13 +767,13 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
                 UiTitleLabel.Position = originalPos + UDim2.fromOffset(math.random(-2,2), math.random(-2,2))
                 UiTitleLabel.Rotation = math.random(-1,1) * 0.5
                 task.wait(0.07)
-            elseif r < 0.1 then -- Glitch Warna & Stroke
+            elseif r < 0.1 then -- Color & Stroke Glitch
                 UiTitleLabel.TextColor3 = Color3.fromHSV(math.random(), 1, 1)
                 UiTitleLabel.TextStrokeColor3 = Color3.fromHSV(math.random(), 0.8, 1)
                 UiTitleLabel.TextStrokeTransparency = math.random() * 0.3
                 UiTitleLabel.Rotation = math.random(-1,1) * 0.2
                 task.wait(0.1)
-            else -- Kembali normal atau animasi warna halus
+            else -- Return to normal or subtle color animation
                 UiTitleLabel.Text = originalText
                 UiTitleLabel.TextStrokeTransparency = 0.5
                 UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
@@ -795,11 +781,11 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
                 UiTitleLabel.Rotation = 0
             end
 
-            -- Animasi warna RGB halus jika tidak sedang glitch parah
+            -- Subtle RGB color animation if not severely glitching
             if not isGlitchingText then
                 local hue = (tick()*0.1) % 1
                 local r_rgb, g_rgb, b_rgb = Color3.fromHSV(hue, 1, 1).R, Color3.fromHSV(hue, 1, 1).G, Color3.fromHSV(hue, 1, 1).B
-                r_rgb = math.min(1, r_rgb + 0.6) -- Dominasi merah
+                r_rgb = math.min(1, r_rgb + 0.6) -- Red dominance
                 g_rgb = g_rgb * 0.4
                 b_rgb = b_rgb * 0.4
                 UiTitleLabel.TextColor3 = Color3.new(r_rgb, g_rgb, b_rgb)
@@ -809,17 +795,17 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
     end
 end)
 
-task.spawn(function() -- Animasi Tombol (Subtle Pulse)
+task.spawn(function() -- Button Animation (Subtle Pulse)
     local buttonsToAnimate = {StartButton, ApplyTimersButton, MinimizeButton}
     while ScreenGui and ScreenGui.Parent do
-        if not isMinimized then -- Hanya beranimasi saat tidak diminimize
+        if not isMinimized then -- Only animate when not minimized
             for _, btn in ipairs(buttonsToAnimate) do
                 if btn and btn.Parent then
                     local originalBorder = btn.BorderColor3
 
-                    -- Efek hover/pulse sederhana pada border
+                    -- Simple hover/pulse effect on border
                     if btn.Name == "StartButton" and scriptRunning then
-                        btn.BorderColor3 = Color3.fromRGB(255,100,100) -- Merah lebih terang saat running
+                        btn.BorderColor3 = Color3.fromRGB(255,100,100) -- Brighter red when running
                     else
                         local h,s,v = Color3.toHSV(originalBorder)
                         btn.BorderColor3 = Color3.fromHSV(h,s, math.sin(tick()*2)*0.1 + 0.9) -- Pulse V
@@ -831,25 +817,25 @@ task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     end
 end)
 
-task.spawn(function() -- Animasi Pop-up 'Z' (RGB Pulse)
+task.spawn(function() -- 'Z' Pop-up Animation (RGB Pulse)
     while ScreenGui and ScreenGui.Parent do
         if isMinimized and minimizedZLabel.Visible then
-            local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
+            local hue = (tick() * 0.2) % 1 -- RGB color animation
             minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
         end
         task.wait(0.05)
     end
 end)
--- --- END ANIMASI UI ---
+-- --- END UI ANIMATIONS ---
 
 -- BindToClose
 game:BindToClose(function()
-    if scriptRunning then warn("Game ditutup, menghentikan skrip..."); scriptRunning = false; task.wait(0.5) end
+    if scriptRunning then warn("Game closed, stopping script..."); scriptRunning = false; task.wait(0.5) end
     if ScreenGui and ScreenGui.Parent then pcall(function() ScreenGui:Destroy() end) end
-    print("Pembersihan skrip selesai.")
+    print("Script cleanup complete.")
 end)
 
--- Inisialisasi
-print("Skrip Otomatisasi Ekspesisi Telah Dimuat.")
+-- Initialization
+print("Expedition Automation Script Loaded.")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
