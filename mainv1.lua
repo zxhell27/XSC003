@@ -67,7 +67,7 @@ local timers = {
     teleport_wait_time = 300,
     teleport_delay_between_points = 5,
     log_clear_interval = 60,
-    teleport_y_offset = 5,
+    teleport_y_offset = 7, -- Increased Y-offset slightly
     water_refill_duration = 5,
     water_drink_interval = 300,
     water_drink_count = 5,
@@ -394,7 +394,7 @@ local function toggleMinimize()
         local targetY = 1 - (minimizedFrameSize.Y.Offset / ScreenGui.AbsoluteSize.Y) - 0.02
         local targetPosition = UDim2.new(targetX, 0, targetY, 0)
         animateFrame(minimizedFrameSize, targetPosition)
-        Frame.Draggable = false
+        Frame.Draggable = true -- Allow dragging when minimized
         MinimizeButton.Visible = false
     else
         minimizedElement.Visible = false
@@ -427,27 +427,50 @@ end
 local function teleportPlayer(cframeTarget, locationName)
     if not scriptRunning then return false end
     local success, err = pcall(function()
-        if LocalPlayer and LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then
-            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                LocalPlayer.Character.Archivable = true
-                local originalCanCollide = {}
-                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        originalCanCollide[part] = part.CanCollide
-                        part.CanCollide = false
-                    end
-                end
-                LocalPlayer.Character.HumanoidRootPart.CFrame = cframeTarget + Vector3.new(0, timers.teleport_y_offset, 0)
-                task.wait(0.1) -- Short delay for teleport to settle
-                for part, canCollide in pairs(originalCanCollide) do
-                    if part and part.Parent then part.CanCollide = canCollide end
-                end
-                LocalPlayer.Character.Archivable = false
+        local char = LocalPlayer.Character
+        if char and char.HumanoidRootPart and char:FindFirstChildOfClass("Humanoid") then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            local hrp = char.HumanoidRootPart
+
+            -- Make character stand if sitting
+            if humanoid.Sit then
+                humanoid.Sit = false
+                task.wait(0.1) -- Give time to stand
             end
+            
+            -- Ensure not anchored
+            if hrp.Anchored then
+                hrp.Anchored = false
+            end
+
+            char.Archivable = true -- Temporarily allow archiving for collision toggling
+            local originalCollisions = {}
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    originalCollisions[part] = {CanCollide = part.CanCollide, CanTouch = part.CanTouch, CanQuery = part.CanQuery}
+                    part.CanCollide = false
+                    part.CanTouch = false -- Also disable CanTouch
+                    part.CanQuery = false -- Disable raycast response
+                end
+            end
+
+            hrp.CFrame = cframeTarget + Vector3.new(0, timers.teleport_y_offset, 0)
+            task.wait(0.2) -- Increased delay for physics to settle after teleport
+
+            for part, collisionProps in pairs(originalCollisions) do
+                if part and part.Parent then -- Check if part still exists
+                    part.CanCollide = collisionProps.CanCollide
+                    part.CanTouch = collisionProps.CanTouch
+                    part.CanQuery = collisionProps.CanQuery
+                end
+            end
+            char.Archivable = false
+            
             appendLog("Teleported to: " .. locationName)
             updateStatus("Teleported to: " .. locationName)
-        else error("Player character or HumanoidRootPart not found.") end
+        else
+            error("Player character, HumanoidRootPart, or Humanoid not found.")
+        end
     end)
     if not success then
         appendLog("Teleport Error to " .. locationName .. ": " .. tostring(err))
@@ -459,18 +482,20 @@ end
 
 -- Fungsi untuk mengisi air
 local function refillWater(currentCampNameKey) -- currentCampNameKey is like "Camp 1 Main Tent"
-    if not scriptRunning or not LocalPlayer or not LocalPlayer.Character then return false end
+    if not scriptRunning or not LocalPlayer or not LocalPlayer.Character then
+        appendLog("RefillWater: Script not running or player/character missing.")
+        return false
+    end
 
     local campNumberMatch = currentCampNameKey:match("Camp (%d)")
     if not campNumberMatch then
-        appendLog("Could not determine camp number from: " .. currentCampNameKey)
+        appendLog("RefillWater: Could not determine camp number from: " .. currentCampNameKey)
         return false
     end
     local campId = "Camp " .. campNumberMatch -- e.g., "Camp 1"
 
-    -- Check if water has been refilled for this camp visit
     if lastRefillCampName == campId and hasRefilledWaterAtCurrentCamp then
-        appendLog("Water already refilled at " .. campId .. " during this visit. Skipping.")
+        appendLog("RefillWater: Water already refilled at " .. campId .. " during this visit. Skipping.")
         return true
     end
 
@@ -478,22 +503,29 @@ local function refillWater(currentCampNameKey) -- currentCampNameKey is like "Ca
     local refillCFrame = teleportLocations[waterRefillLocationName]
 
     if refillCFrame then
-        appendLog("Teleporting to water refill point for " .. campId .. "...")
+        appendLog("RefillWater: Teleporting to water refill point for " .. campId .. " (" .. waterRefillLocationName .. ")")
         if teleportPlayer(refillCFrame, "Water Refill " .. campId) then
             updateStatus("Refilling water at " .. campId .. "...")
-            appendLog("Refilling water for " .. timers.water_refill_duration .. " seconds.")
-            waitSeconds(timers.water_refill_duration)
-            if not scriptRunning then return false end -- Check if script stopped during wait
-            appendLog("Water refill complete at " .. campId .. ".")
+            appendLog("RefillWater: At water point. Waiting for " .. timers.water_refill_duration .. " seconds for game to process refill.")
+            appendLog("RefillWater: IMPORTANT - This script ONLY waits. Actual water filling depends on your game's server mechanics at this location.")
+            
+            waitSeconds(timers.water_refill_duration) -- Wait for the game's refill mechanism
+            
+            if not scriptRunning then
+                appendLog("RefillWater: Script stopped during wait.")
+                return false
+            end 
+            
+            appendLog("RefillWater: Assumed water refill complete at " .. campId .. " (client-side wait finished).")
             hasRefilledWaterAtCurrentCamp = true
-            lastRefillCampName = campId -- Mark this camp as refilled for the current cycle
+            lastRefillCampName = campId
             return true
         else
-            appendLog("Failed to teleport to water refill point for " .. campId .. ".")
+            appendLog("RefillWater: Failed to teleport to water refill point for " .. campId .. ".")
             return false
         end
     else
-        appendLog("Water refill location not defined for " .. campId .. ".")
+        appendLog("RefillWater: Water refill location CFrame not defined for " .. waterRefillLocationName .. ".")
         return false
     end
 end
@@ -538,60 +570,53 @@ local function autoTeleportCycle()
             waitSeconds(5)
             currentPointIndex = currentPointIndex + 1
             if currentPointIndex > #locations then currentPointIndex = 1 end
-            continue -- Skip to next location
+            continue 
         end
         
-        -- Reset refill status if moving to a new camp number
         local currentCampNumberMatch = originalLocationName:match("Camp (%d)")
+        local currentCampId = nil
         if currentCampNumberMatch then
-            local currentCampId = "Camp " .. currentCampNumberMatch
+            currentCampId = "Camp " .. currentCampNumberMatch
             if lastRefillCampName ~= currentCampId then
                 hasRefilledWaterAtCurrentCamp = false
-                -- appendLog("New camp (" .. currentCampId .. "), water refill status reset.")
+                appendLog("AutoTeleport: New camp (" .. currentCampId .. "), water refill status reset.")
             end
         elseif originalLocationName == "South Pole Checkpoint" then
-             -- Reset for South Pole if it's considered a new "zone"
-            if lastRefillCampName ~= "South Pole" then
-                 hasRefilledWaterAtCurrentCamp = false
-                 -- appendLog("Reached South Pole, water refill status reset (if applicable).")
+            -- No specific water refill logic for South Pole in this version, but can be added
+            if lastRefillCampName ~= "South Pole" then -- Treat South Pole as a unique "camp" for refill logic
+                 hasRefilledWaterAtCurrentCamp = false 
             end
         end
 
         updateStatus("Auto-teleporting to: " .. originalLocationName)
-        appendLog("Starting auto-teleport to: " .. originalLocationName)
+        appendLog("AutoTeleport: Starting auto-teleport to: " .. originalLocationName)
 
         if not teleportPlayer(originalCFrameTarget, originalLocationName) then
-            appendLog("Auto-teleport failed for " .. originalLocationName .. ". Retrying in 5 seconds...")
+            appendLog("AutoTeleport: Failed for " .. originalLocationName .. ". Retrying in 5 seconds...")
             waitSeconds(5)
             if not scriptRunning then break end
-            -- Potentially retry or skip, for now, it will just delay and try next cycle if it fails
         else
-            -- Successful teleport to camp point, now handle water refill
-            if originalLocationName:find("Camp") then -- Only refill at Camps
-                local campNumberMatch = originalLocationName:match("Camp (%d)")
-                if campNumberMatch then
-                    local campId = "Camp " .. campNumberMatch
-                    if not hasRefilledWaterAtCurrentCamp or lastRefillCampName ~= campId then
-                        appendLog("Attempting water refill for " .. campId)
-                        if refillWater(originalLocationName) then -- Pass the original camp key
-                            -- After refilling, teleport back to the original camp location
-                            if scriptRunning then
-                                appendLog("Returning to " .. originalLocationName .. " after water refill.")
-                                teleportPlayer(originalCFrameTarget, originalLocationName .. " (Return)")
-                            end
-                        else
-                             appendLog("Water refill process failed or skipped for " .. campId)
+            -- Successful teleport to camp point
+            if currentCampId then -- Only try to refill if it's a numbered camp
+                if not hasRefilledWaterAtCurrentCamp or lastRefillCampName ~= currentCampId then
+                    appendLog("AutoTeleport: Arrived at " .. currentCampId .. ". Attempting water refill.")
+                    if refillWater(originalLocationName) then 
+                        if scriptRunning then
+                            appendLog("AutoTeleport: Returning to " .. originalLocationName .. " after water refill attempt.")
+                            teleportPlayer(originalCFrameTarget, originalLocationName .. " (Return)")
                         end
                     else
-                        appendLog("Water already refilled for " .. campId .. " this visit.")
+                         appendLog("AutoTeleport: Water refill process failed or was skipped for " .. currentCampId .. ". Continuing.")
                     end
+                else
+                    appendLog("AutoTeleport: Water already refilled for " .. currentCampId .. " this visit.")
                 end
             end
         end
         
         if not scriptRunning then break end
 
-        appendLog("Waiting for " .. timers.teleport_wait_time .. " seconds at " .. originalLocationName)
+        appendLog("AutoTeleport: Waiting for " .. timers.teleport_wait_time .. " seconds at " .. originalLocationName)
         local remainingTime = timers.teleport_wait_time
         while remainingTime > 0 and autoTeleportActive and scriptRunning do
             updateStatus(string.format("Auto-teleport: %s (%d s left)", originalLocationName, math.floor(remainingTime)))
@@ -603,19 +628,19 @@ local function autoTeleportCycle()
         currentPointIndex = currentPointIndex + 1
         if currentPointIndex > #locations then
             currentPointIndex = 1
-            appendLog("Auto-teleport cycle complete. Restarting cycle.")
-            lastRefillCampName = nil -- Reset last refill camp at the end of a full cycle
+            appendLog("AutoTeleport: Cycle complete. Restarting cycle.")
+            lastRefillCampName = nil 
             hasRefilledWaterAtCurrentCamp = false
         end
 
         if autoTeleportActive and scriptRunning then
-            appendLog("Delaying " .. timers.teleport_delay_between_points .. " seconds before next teleport.")
+            appendLog("AutoTeleport: Delaying " .. timers.teleport_delay_between_points .. " seconds before next teleport.")
             waitSeconds(timers.teleport_delay_between_points)
         end
     end
     if scriptRunning then
         updateStatus("AUTO_TELEPORT_STOPPED")
-        appendLog("Auto-teleport sequence halted.")
+        appendLog("AutoTeleport: Sequence halted.")
     end
 end
 
@@ -630,7 +655,7 @@ StartAutoTeleportButton.MouseButton1Click:Connect(function()
         StartAutoTeleportButton.TextColor3 = Color3.fromRGB(255,255,255)
         updateStatus("AUTO_TELEPORT_ACTIVE")
         appendLog("Auto teleport sequence started.")
-        lastRefillCampName = nil -- Reset on start, so first camp always refills
+        lastRefillCampName = nil 
         hasRefilledWaterAtCurrentCamp = false
         if not autoTeleportThread or coroutine.status(autoTeleportThread) == "dead" then
             autoTeleportThread = task.spawn(autoTeleportCycle)
@@ -733,9 +758,11 @@ task.spawn(function() -- Animasi Frame Utama (Border RGB dan Glitch Ringan)
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
             Frame.BorderColor3 = Color3.fromHSV((h + 0.008)%1, 1, 1) -- Saturasi & Value Maks untuk warna cerah
             Frame.BorderSizePixel = borderThicknessBase
-        else -- Saat diminimize, serahkan ke animasi minimizedElement
-            -- Style Frame saat minimized diatur oleh animasi minimizedElement
-            task.wait(0.1) -- Kurangi frekuensi update saat minimized jika tidak ada animasi khusus Frame
+        else 
+            -- Saat diminimize, style Frame diatur oleh animasi minimizedElement
+            -- Namun, pastikan posisi Frame yang diminimize tetap (diatur oleh toggleMinimize)
+            -- Tidak perlu mengubah posisi Frame di sini saat isMinimized true
+            task.wait(0.1) 
         end
         task.wait(0.04)
     end
@@ -805,7 +832,7 @@ task.spawn(function() -- Animasi UiTitleLabel (Glitch Text Transition dan RGB No
 end)
 
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
-    local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton} -- TeleportButton dan TeleportLocationSelector dihapus
+    local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton} 
     while ScreenGui and ScreenGui.Parent and scriptRunning do
         if not isMinimized then
             for _, btn in ipairs(buttonsToAnimate) do
@@ -825,11 +852,7 @@ task.spawn(function() -- Animasi Tombol (Subtle Pulse)
 end)
 
 task.spawn(function() -- Animasi Glitch Pop-up 'Z'
-    -- glitchChars sudah didefinisikan global
     local originalZText = "Z"
-    local originalZPos = minimizedElement.Position -- Seharusnya (0,0,0,0) relatif ke Frame
-    local originalZSize = minimizedElement.Size   -- Seharusnya (1,0,1,0) relatif ke Frame
-
     while ScreenGui and ScreenGui.Parent and scriptRunning do
         if isMinimized and minimizedElement and minimizedElement.Visible then
             local r = math.random()
@@ -838,24 +861,25 @@ task.spawn(function() -- Animasi Glitch Pop-up 'Z'
                 minimizedElement.TextColor3 = Color3.fromHSV(math.random(), 1, 1)
                 minimizedElement.BorderColor3 = Color3.fromHSV(math.random(), 1, 1)
                 minimizedElement.BorderSizePixel = math.random(1,4)
-                minimizedElement.Rotation = math.random(-5,5)
-                -- Glitch pada Frame yang menampung Z
-                Frame.Position = Frame.Position + UDim2.fromOffset(math.random(-3,3), math.random(-3,3))
+                minimizedElement.Rotation = math.random(-7,7) -- Increased rotation for more glitch
+                
+                -- Simulasikan glitch pada Frame yang menampung Z (karena Z mengisi seluruh frame kecil)
+                -- Posisi Frame yang diminimize seharusnya sudah diatur oleh toggleMinimize
+                -- Kita hanya akan mengglitch border dan sedikit ukuran jika diinginkan
                 Frame.BorderSizePixel = math.random(2,5)
-                Frame.BorderColor3 = Color3.fromHSV(math.random(),1,1)
-                task.wait(0.03)
-                minimizedElement.Text = originalZText -- Cepat kembali ke Z atau glitch lain
+                Frame.BorderColor3 = minimizedElement.BorderColor3 -- Sinkronkan warna border
+                
+                task.wait(0.03 + math.random()*0.03) -- Variasi waktu glitch
+
+                minimizedElement.Text = originalZText 
                 minimizedElement.TextColor3 = Color3.fromHSV(math.random(), 1, 1)
                 minimizedElement.BorderColor3 = Color3.fromHSV(math.random(), 1, 1)
                 minimizedElement.BorderSizePixel = math.random(2,3)
-                minimizedElement.Rotation = math.random(-3,3)
-                -- Reset Frame
-                local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02
-                local targetY = 1 - (minimizedFrameSize.Y.Offset / ScreenGui.AbsoluteSize.Y) - 0.02
-                Frame.Position = UDim2.new(targetX, 0, targetY, 0)
-                Frame.BorderSizePixel = 2
-                Frame.BorderColor3 = Color3.fromRGB(255,0,0)
-                task.wait(0.04)
+                minimizedElement.Rotation = math.random(-4,4)
+                
+                Frame.BorderSizePixel = 2 -- Reset border Frame
+                Frame.BorderColor3 = minimizedElement.BorderColor3 -- Tetap sinkron atau warna default
+                task.wait(0.04 + math.random()*0.03)
             else -- Glitch ringan / warna normal
                 minimizedElement.Text = originalZText
                 local hue = (tick() * 0.3) % 1
@@ -863,7 +887,7 @@ task.spawn(function() -- Animasi Glitch Pop-up 'Z'
                 minimizedElement.BorderColor3 = Color3.fromHSV((hue + 0.3)%1, 0.8, 1)
                 minimizedElement.BorderSizePixel = 2
                 minimizedElement.Rotation = 0
-                -- Pastikan Frame kembali ke style normal saat Z tidak glitch intens
+                
                 Frame.BorderColor3 = minimizedElement.BorderColor3
                 Frame.BorderSizePixel = minimizedElement.BorderSizePixel
             end
@@ -888,6 +912,6 @@ game:BindToClose(function()
 end)
 
 -- Inisialisasi
-appendLog("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat. V3.")
+appendLog("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat. V4 (Stabilitas, Refill Logic, UI Drag).")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
