@@ -1,6 +1,5 @@
--- MainScript.lua
--- Gabungan UI dan Logika dengan UI pop-up 'Z' merah RGB, dan fungsi Teleportasi.
--- Alur utama difokuskan hanya pada urutan teleportasi dari dokumen yang diberikan.
+-- MainScript.lua - Gabungan UI dan Logika Teleportasi Otomatis
+-- Dibuat berdasarkan referensi mainv2.lua dan script Roblox via executor
 
 -- // UI FRAME (Struktur Asli Dipertahankan) //
 local ScreenGui = Instance.new("ScreenGui")
@@ -33,11 +32,7 @@ local timerInputElements = {}
 
 -- --- Variabel Kontrol dan State ---
 local scriptRunning = false
-local stopUpdateQi = false -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
-local pauseUpdateQiTemporarily = false -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
-local mainCycleThread = nil
-local aptitudeMineThread = nil -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
-local updateQiThread = nil -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
+local mainCycleThread = nil -- Thread utama untuk siklus teleportasi
 
 local isMinimized = false
 local originalFrameSize = UDim2.new(0, 260, 0, 420) -- Ukuran awal UI lebih kecil
@@ -49,79 +44,86 @@ local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibu
 
 -- --- Tabel Konfigurasi Timer ---
 local timers = {
-    -- Timer yang relevan untuk alur teleportasi
-    wait_after_camp_teleport = 5 * 60, -- 5 menit (diambil dari dokumen alur)
-    genericShortDelay = 0.5, -- Jeda singkat setelah teleportasi checkpoint
-
-    -- Timer lain dari mainv2.lua yang mungkin tidak digunakan dalam alur teleportasi saja,
-    -- tetapi dipertahankan untuk konsistensi UI konfigurasi timer.
-    wait_1m30s_after_first_items = 90,
-    alur_wait_40s_hide_qi = 40,
-    comprehend_duration = 20,
-    post_comprehend_qi_duration = 60,
-    user_script_wait1_before_items1 = 15,
-    user_script_wait2_after_items1 = 10,
-    user_script_wait3_before_items2 = 0.01,
-    user_script_wait4_before_forbidden = 0.01,
-    update_qi_interval = 1,
-    aptitude_mine_interval = 0.1,
-    reincarnateDelay = 0.5,
-    buyItemDelay = 0.25,
-    changeMapDelay = 0.5,
-    fireserver_generic_delay = 0.25
+    wait_after_teleport = 300, -- Default 5 menit (300 detik)
+    genericShortDelay = 0.5,
 }
 
--- --- Tabel Konfigurasi Teleportasi ---
--- Data ini diambil langsung dari file "script Roblox via executor" Anda.
-local teleportLocations = {
+-- --- Konfigurasi Teleportasi ---
+-- Menggunakan tabel untuk menyimpan data teleportasi agar lebih terstruktur dan mudah diatur
+local teleportSequence = {
     -- Camp 1
-    ["Camp1"] = {
-        path = "workspace[\"Camp_Main_Tents%\"].Camp1:GetChildren()[11]",
-        cframe = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381)
+    {
+        name = "Camp 1 Main Tent",
+        path = "Camp_Main_Tents%.Camp1", -- Path dengan wildcard
+        childIndex = 11, -- Index anak jika diperlukan (untuk GetChildren()[index])
+        cframe = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381),
+        waitAfter = 300 -- 5 menit
     },
-    ["CheckpointCamp1"] = {
-        path = "workspace[\"Checkpoints%\"][\"Camp 1\"].SpawnLocation",
-        cframe = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    {
+        name = "Camp 1 Checkpoint",
+        path = "Checkpoints%.Camp 1.SpawnLocation",
+        cframe = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        waitAfter = 300 -- 5 menit
     },
     -- Camp 2
-    ["Camp2"] = {
-        path = "workspace[\"Camp_Main_Tents%\"].Camp2:GetChildren()[11]",
-        cframe = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277)
+    {
+        name = "Camp 2 Main Tent",
+        path = "Camp_Main_Tents%.Camp2",
+        childIndex = 11,
+        cframe = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277),
+        waitAfter = 300 -- 5 menit
     },
-    ["CheckpointCamp2"] = {
-        path = "workspace[\"Checkpoints%\"][\"Camp 2\"].SpawnLocation",
-        cframe = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    {
+        name = "Camp 2 Checkpoint",
+        path = "Checkpoints%.Camp 2.SpawnLocation",
+        cframe = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        waitAfter = 300 -- 5 menit
     },
     -- Camp 3
-    ["Camp3"] = {
-        path = "workspace[\"Camp_Main_Tents%\"][\"Camp3\"]:GetChildren()[13]",
-        cframe = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121)
+    {
+        name = "Camp 3 Main Tent",
+        path = "Camp_Main_Tents%.Camp3",
+        childIndex = 13,
+        cframe = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121),
+        waitAfter = 300 -- 5 menit
     },
-    ["CheckpointCamp3"] = {
-        path = "workspace[\"Checkpoints%\"][\"Camp 3\"].SpawnLocation",
-        cframe = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    {
+        name = "Camp 3 Checkpoint",
+        path = "Checkpoints%.Camp 3.SpawnLocation",
+        cframe = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        waitAfter = 300 -- 5 menit
     },
     -- Camp 4
-    ["Camp4"] = {
-        path = "workspace[\"Camp_Main_Tents%\"].Camp4.Floor",
-        cframe = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052)
+    {
+        name = "Camp 4 Floor",
+        path = "Camp_Main_Tents%.Camp4.Floor",
+        cframe = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052),
+        waitAfter = 300 -- 5 menit
     },
-    ["CheckpointCamp4"] = {
-        path = "workspace[\"Checkpoints%\"][\"Camp 4\"].SpawnLocation",
-        cframe = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    {
+        name = "Camp 4 Checkpoint",
+        path = "Checkpoints%.Camp 4.SpawnLocation",
+        cframe = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        waitAfter = 300 -- 5 menit
     },
     -- South Pole
-    ["CheckpointSouthPole"] = {
-        path = "workspace[\"Checkpoints%\"][\"South Pole\"].SpawnLocation",
-        cframe = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05)
+    {
+        name = "South Pole Checkpoint",
+        path = "Checkpoints%.South Pole.SpawnLocation",
+        cframe = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05),
+        waitAfter = 300 -- 5 menit
     },
 }
 
+
 -- // Parent UI ke player //
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
 local function setupCoreGuiParenting()
-    local coreGuiService = game:GetService("CoreGui")
-    if not ScreenGui.Parent or ScreenGui.Parent ~= coreGuiService then
-        ScreenGui.Parent = coreGuiService
+    if not ScreenGui.Parent or ScreenGui.Parent ~= CoreGui then
+        ScreenGui.Parent = CoreGui
     end
     if not Frame.Parent or Frame.Parent ~= ScreenGui then
         Frame.Parent = ScreenGui
@@ -210,7 +212,7 @@ local yOffsetForTimers = yOffsetForTitle + 100 -- Disesuaikan
 -- --- Konfigurasi Timer UI ---
 TimerTitleLabel.Size = UDim2.new(1, -40, 0, 20) -- Lebih kecil
 TimerTitleLabel.Position = UDim2.new(0, 20, 0, yOffsetForTimers)
-TimerTitleLabel.Text = "// KONFIGURASI_TIMER"
+TimerTitleLabel.Text = "// TIMER CONFIGURATION_SEQ"
 TimerTitleLabel.Font = Enum.Font.Code
 TimerTitleLabel.TextSize = 14 -- Ukuran font sedang
 TimerTitleLabel.TextColor3 = Color3.fromRGB(255, 80, 80) -- Merah terang
@@ -239,7 +241,7 @@ local function createTimerInput(name, yPos, labelText, initialValue)
     input.Size = UDim2.new(0.45, -25, 0, 20) -- Lebih kecil
     input.Position = UDim2.new(0.55, 5, 0, yPos + yOffsetForTimers)
     input.Text = tostring(initialValue)
-    input.PlaceholderText = "detik" -- Diubah ke Bahasa Indonesia
+    input.PlaceholderText = "sec"
     input.Font = Enum.Font.SourceSansSemibold
     input.TextSize = 12 -- Ukuran font sedang
     input.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -259,17 +261,12 @@ end
 
 local currentYConfig = 30 -- Jarak dari TimerTitleLabel (disesuaikan)
 -- Inisialisasi nilai input timer dari tabel timers
--- Hanya tampilkan timer yang relevan untuk teleportasi atau yang umum
-timerInputElements.waitAfterCampTeleportInput = createTimerInput("WaitAfterCampTeleport", currentYConfig, "Tunggu Setelah Camp", timers.wait_after_camp_teleport)
-currentYConfig = currentYConfig + 25
--- Anda bisa menambahkan lebih banyak input timer jika ada durasi spesifik lainnya yang ingin dikonfigurasi pengguna untuk alur teleportasi.
--- Untuk saat ini, saya hanya menampilkan yang paling relevan.
-timerInputElements.genericShortDelayInput = createTimerInput("GenericShortDelay", currentYConfig, "Jeda Singkat", timers.genericShortDelay)
-currentYConfig = currentYConfig + 35 -- Disesuaikan
+timerInputElements.waitAfterTeleportInput = createTimerInput("WaitAfterTeleport", currentYConfig, "WAIT_AFTER_TELEPORT", timers.wait_after_teleport)
+currentYConfig = currentYConfig + 25 -- Jarak antar input (disesuaikan)
 
 ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30) -- Lebih kecil
 ApplyTimersButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers)
-ApplyTimersButton.Text = "TERAPKAN_TIMER" -- Diubah ke Bahasa Indonesia
+ApplyTimersButton.Text = "APPLY_TIMERS"
 ApplyTimersButton.Font = Enum.Font.SourceSansBold
 ApplyTimersButton.TextSize = 14 -- Ukuran font sedang
 ApplyTimersButton.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -315,9 +312,8 @@ minimizedZLabel.Visible = false -- Awalnya sembunyi
 -- Kumpulan elemen yang visibilitasnya akan di-toggle
 elementsToToggleVisibility = {
     UiTitleLabel, StartButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
-    timerInputElements.waitAfterCampTeleportInput, timerInputElements.waitAfterCampTeleportLabel,
-    timerInputElements.genericShortDelayInput, timerInputElements.genericShortDelayLabel,
-    MinimizeButton -- Sertakan MinimizeButton di sini untuk menyembunyikannya dalam mode 'Z'
+    timerInputElements.WaitAfterTeleportLabel, timerInputElements.WaitAfterTeleportInput,
+    MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
 }
 
 -- // Fungsi Bantu UI //
@@ -342,7 +338,10 @@ end
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
-        -- Sembunyikan semua elemen kecuali Frame dan label 'Z'
+        -- Simpan posisi original Frame sebelum diubah
+        local originalFramePosition = Frame.Position
+
+        -- Sembunyikan semua elemen kecuali Frame dan 'Z' label
         for _, element in ipairs(elementsToToggleVisibility) do
             if element and element.Parent then element.Visible = false end
         end
@@ -384,137 +383,109 @@ local function waitSeconds(sec)
     local startTime = tick()
     repeat
         task.wait()
+        -- Perbarui status setiap detik saat menunggu
+        local remainingTime = math.floor(sec - (tick() - startTime))
+        if remainingTime >= 0 then
+            updateStatus(string.format("WAITING: %ds", remainingTime))
+        end
     until not scriptRunning or tick() - startTime >= sec
 end
 
--- Fungsi fireRemoteEnhanced (dipertahankan untuk kompatibilitas, meskipun mungkin tidak digunakan dalam alur teleportasi saja)
-local function fireRemoteEnhanced(remoteName, pathType, ...)
-    local argsToUnpack = table.pack(...)
-    local remoteEventFolder
-    local success = false
-    local errMessage = "Unknown error"
-    local pcallSuccess, pcallResult = pcall(function()
-        if pathType == "AreaEvents" then
-            remoteEventFolder = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents", 9e9):WaitForChild("AreaEvents", 9e9)
+-- // Fungsi untuk mencari objek/part secara otomatis //
+-- Ini adalah fungsi penting untuk mengatasi ketidakmungkinan path yang tepat
+local function findObject(baseObject, path)
+    local parts = string.split(path, ".")
+    local currentObject = baseObject
+
+    for i, partName in ipairs(parts) do
+        -- Handle wildcard '%'
+        if string.find(partName, "%%") then
+            local actualPartName = string.gsub(partName, "%%", "")
+            local found = false
+            for _, child in ipairs(currentObject:GetChildren()) do
+                if string.find(child.Name, actualPartName) then
+                    currentObject = child
+                    found = true
+                    break
+                end
+            end
+            if not found then return nil end -- Tidak ditemukan objek dengan wildcard
         else
-            remoteEventFolder = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents", 9e9)
+            currentObject = currentObject:FindFirstChild(partName)
         end
-        local remote = remoteEventFolder:WaitForChild(remoteName, 9e9)
-        remote:FireServer(table.unpack(argsToUnpack, 1, argsToUnpack.n))
-    end)
-    if pcallSuccess then success = true
-    else
-        errMessage = tostring(pcallResult)
-        if StatusLabel and StatusLabel.Parent then StatusLabel.Text = "STATUS: ERR_FIRE_" .. string.upper(remoteName) end
-        warn("Error firing " .. remoteName .. ": " .. errMessage)
-        success = false
+
+        if not currentObject then
+            return nil -- Objek tidak ditemukan di sepanjang path
+        end
     end
-    return success
+    return currentObject
 end
 
 -- // Fungsi Teleportasi //
-local Players = game:GetService("Players")
-local localPlayer = Players.LocalPlayer
-
-local function teleportToCFrame(targetCFrame, locationName)
-    if not localPlayer or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        updateStatus("Teleport_Gagal: Karakter_Tidak_Ditemukan") -- Diubah ke Bahasa Indonesia
-        warn("Teleport gagal: Karakter LocalPlayer atau HumanoidRootPart tidak ditemukan.") -- Diubah ke Bahasa Indonesia
-        return false
-    end
-
-    local hrp = localPlayer.Character.HumanoidRootPart
-    local success = pcall(function()
+local function teleportPlayer(targetCFrame)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local hrp = character.HumanoidRootPart
+        -- Pastikan HumanoidRootPart tidak di-anchored atau di-locked
+        hrp.Anchored = false
+        hrp.CanCollide = false -- Agar tidak tersangkut
         hrp.CFrame = targetCFrame
-    end)
-
-    if success then
-        updateStatus("Teleporting: " .. (locationName or "Lokasi_Tidak_Dikenal")) -- Diubah ke Bahasa Indonesia
+        task.wait(timers.genericShortDelay) -- Beri sedikit waktu untuk fisika
+        hrp.CanCollide = true
         return true
     else
-        updateStatus("Teleport_Gagal: " .. (locationName or "Lokasi_Tidak_Dikenal")) -- Diubah ke Bahasa Indonesia
-        warn("Error teleportasi ke " .. (locationName or "Lokasi_Tidak_Dikenal") .. ": " .. tostring(pcallResult)) -- Diubah ke Bahasa Indonesia
+        warn("HumanoidRootPart tidak ditemukan atau karakter tidak ada.")
         return false
     end
 end
 
--- // Fungsi utama alur (Hanya Teleportasi) //
-local function runCycle()
-    updateStatus("Memulai_Alur_Teleportasi") -- Diubah ke Bahasa Indonesia
+-- // Fungsi utama siklus teleportasi //
+local function runTeleportCycle()
+    for i, step in ipairs(teleportSequence) do
+        if not scriptRunning then break end
 
-    -- Teleport ke Camp 1
-    updateStatus("Teleportasi_ke_Camp_1")
-    if not teleportToCFrame(teleportLocations.Camp1.cframe, "Camp 1") then scriptRunning = false; return end
-    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
-    if not scriptRunning then return end
+        updateStatus("TELEPORTING TO: " .. step.name)
+        print("Attempting to teleport to: " .. step.name)
 
-    -- Teleport ke Checkpoint Camp 1
-    updateStatus("Teleportasi_ke_Checkpoint_Camp_1")
-    if not teleportToCFrame(teleportLocations.CheckpointCamp1.cframe, "Checkpoint Camp 1") then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay) -- Jeda singkat setelah teleport
-    if not scriptRunning then return end
+        local targetPart = nil
+        if step.path then
+            -- Coba cari objek dengan fungsi findObject
+            targetPart = findObject(game.Workspace, step.path)
+            if targetPart then
+                print("Found target part via path: " .. targetPart.Name)
+                -- Jika ada childIndex, coba ambil child spesifik
+                if step.childIndex and #targetPart:GetChildren() >= step.childIndex then
+                    targetPart = targetPart:GetChildren()[step.childIndex]
+                    print("Found target part via child index: " .. targetPart.Name)
+                end
+            else
+                warn("Could not find target part via path: " .. step.path)
+            end
+        end
 
-    -- Teleport ke Camp 2
-    updateStatus("Teleportasi_ke_Camp_2")
-    if not teleportToCFrame(teleportLocations.Camp2.cframe, "Camp 2") then scriptRunning = false; return end
-    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
-    if not scriptRunning then return end
+        local success = false
+        if targetPart then
+            -- Jika objek ditemukan, gunakan CFrame objek tersebut
+            success = teleportPlayer(targetPart.CFrame)
+        else
+            -- Jika objek tidak ditemukan, gunakan CFrame yang sudah ditentukan di tabel
+            success = teleportPlayer(step.cframe)
+        end
 
-    -- Teleport ke Checkpoint Camp 2
-    updateStatus("Teleportasi_ke_Checkpoint_Camp_2")
-    if not teleportToCFrame(teleportLocations.CheckpointCamp2.cframe, "Checkpoint Camp 2") then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay)
-    if not scriptRunning then return end
+        if not success then
+            updateStatus("TELEPORT FAILED: " .. step.name)
+            warn("Teleportation failed for: " .. step.name)
+            scriptRunning = false -- Hentikan skrip jika teleportasi gagal
+            break
+        end
 
-    -- Teleport ke Camp 3
-    updateStatus("Teleportasi_ke_Camp_3")
-    if not teleportToCFrame(teleportLocations.Camp3.cframe, "Camp 3") then scriptRunning = false; return end
-    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
-    if not scriptRunning then return end
-
-    -- Teleport ke Checkpoint Camp 3
-    updateStatus("Teleportasi_ke_Checkpoint_Camp_3")
-    if not teleportToCFrame(teleportLocations.CheckpointCamp3.cframe, "Checkpoint Camp 3") then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay)
-    if not scriptRunning then return end
-
-    -- Teleport ke Camp 4
-    updateStatus("Teleportasi_ke_Camp_4")
-    if not teleportToCFrame(teleportLocations.Camp4.cframe, "Camp 4") then scriptRunning = false; return end
-    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
-    if not scriptRunning then return end
-
-    -- Teleport ke Checkpoint Camp 4
-    updateStatus("Teleportasi_ke_Checkpoint_Camp_4")
-    if not teleportToCFrame(teleportLocations.CheckpointCamp4.cframe, "Checkpoint Camp 4") then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay)
-    if not scriptRunning then return end
-
-    -- Teleport ke Checkpoint South Pole
-    updateStatus("Teleportasi_ke_Checkpoint_South_Pole")
-    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
-    if not scriptRunning then return end
-    if not teleportToCFrame(teleportLocations.CheckpointSouthPole.cframe, "Checkpoint South Pole") then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay)
-    if not scriptRunning then return end
-
-    updateStatus("Siklus_Teleportasi_Selesai_Mengulang") -- Diubah ke Bahasa Indonesia
-end
-
--- Loop Latar Belakang (Dipertahankan untuk kompatibilitas, tapi tidak akan melakukan apa-apa jika hanya alur teleportasi)
-local function increaseAptitudeMineLoop_enhanced()
-    while scriptRunning do
-        -- fireRemoteEnhanced("IncreaseAptitude", "Base", {}) -- Dikomentari karena bukan bagian dari alur teleportasi
-        task.wait(timers.aptitude_mine_interval)
-        -- if not scriptRunning then break end
-        -- fireRemoteEnhanced("Mine", "Base", {}) -- Dikomentari karena bukan bagian dari alur teleportasi
-        task.wait()
+        updateStatus("ARRIVED AT: " .. step.name)
+        waitSeconds(step.waitAfter or timers.wait_after_teleport) -- Gunakan waitAfter spesifik atau default
     end
-end
-local function updateQiLoop_enhanced()
-    while scriptRunning do
-        -- if not stopUpdateQi and not pauseUpdateQiTemporarily then fireRemoteEnhanced("UpdateQi", "Base", {}) end -- Dikomentari
-        task.wait(timers.update_qi_interval)
+
+    if scriptRunning then
+        updateStatus("CYCLE COMPLETE. RESTARTING...")
+        task.wait(timers.genericShortDelay)
     end
 end
 
@@ -522,30 +493,26 @@ end
 StartButton.MouseButton1Click:Connect(function()
     scriptRunning = not scriptRunning
     if scriptRunning then
-        StartButton.Text = "SISTEM_AKTIF" -- Diubah ke Bahasa Indonesia
+        StartButton.Text = "SYSTEM_ACTIVE"
         StartButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30) -- Merah menyala
         StartButton.TextColor3 = Color3.fromRGB(255,255,255)
-        updateStatus("MEMULAI_URUTAN") -- Diubah ke Bahasa Indonesia
-        stopUpdateQi = false; pauseUpdateQiTemporarily = false
-        -- Loop latar belakang mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk struktur.
-        if not aptitudeMineThread or coroutine.status(aptitudeMineThread) == "dead" then aptitudeMineThread = task.spawn(increaseAptitudeMineLoop_enhanced) end
-        if not updateQiThread or coroutine.status(updateQiThread) == "dead" then updateQiThread = task.spawn(updateQiLoop_enhanced) end
+        updateStatus("INIT_SEQUENCE")
         if not mainCycleThread or coroutine.status(mainCycleThread) == "dead" then
             mainCycleThread = task.spawn(function()
                 while scriptRunning do
-                    runCycle()
+                    runTeleportCycle()
                     if not scriptRunning then break end
-                    updateStatus("SIKLUS_MENGULANG") -- Diubah ke Bahasa Indonesia
+                    updateStatus("CYCLE_REINIT")
                     task.wait(1)
                 end
-                updateStatus("SISTEM_BERHENTI") -- Diubah ke Bahasa Indonesia
-                StartButton.Text = "MULAI_URUTAN" -- Diubah ke Bahasa Indonesia
+                updateStatus("SYSTEM_HALTED")
+                StartButton.Text = "START SEQUENCE"
                 StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
                 StartButton.TextColor3 = Color3.fromRGB(220,220,220)
             end)
         end
     else
-        updateStatus("PERMINTAAN_BERHENTI") -- Diubah ke Bahasa Indonesia
+        updateStatus("HALT_REQUESTED")
     end
 end)
 
@@ -561,16 +528,11 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
         return success
     end
     local allTimersValid = true
-    -- Hanya terapkan timer yang relevan untuk alur teleportasi
-    allTimersValid = applyTextInput(timerInputElements.waitAfterCampTeleportInput, "wait_after_camp_teleport", timerInputElements.waitAfterCampTeleportLabel) and allTimersValid
-    allTimersValid = applyTextInput(timerInputElements.genericShortDelayInput, "genericShortDelay", timerInputElements.genericShortDelayLabel) and allTimersValid
-
+    allTimersValid = applyTextInput(timerInputElements.waitAfterTeleportInput, "wait_after_teleport", timerInputElements.WaitAfterTeleportLabel) and allTimersValid
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
-    if allTimersValid then updateStatus("KONFIGURASI_TIMER_DITERAPKAN") else updateStatus("ERR_INPUT_TIMER_TIDAK_VALID") end -- Diubah ke Bahasa Indonesia
+    if allTimersValid then updateStatus("TIMER_CONFIG_APPLIED") else updateStatus("ERR_TIMER_INPUT_INVALID") end
     task.wait(2)
-    -- Reset warna label
-    if timerInputElements.waitAfterCampTeleportLabel then pcall(function() timerInputElements.waitAfterCampTeleportLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
-    if timerInputElements.genericShortDelayLabel then pcall(function() timerInputElements.genericShortDelayLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    if timerInputElements.WaitAfterTeleportLabel then pcall(function() timerInputElements.WaitAfterTeleportLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     updateStatus(originalStatus)
 end)
 
@@ -710,6 +672,7 @@ game:BindToClose(function()
 end)
 
 -- Inisialisasi
-print("Skrip Otomatisasi (Teleportasi Saja) Telah Dimuat.") -- Pesan inisialisasi yang diperbarui
+print("Skrip Otomatisasi Teleportasi (Versi UI Canggih) Telah Dimuat.")
 task.wait(1)
-if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: SIAGA" end -- Diubah ke Bahasa Indonesia
+if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
+
