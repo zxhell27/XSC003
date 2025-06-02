@@ -1,5 +1,5 @@
 -- MainScript.lua
--- Gabungan UI dan Logika dengan UI pop-up 'Z' merah RGB
+-- Gabungan UI dan Logika dengan UI pop-up 'Z' merah RGB, dan fungsi Teleportasi
 
 -- // UI FRAME (Struktur Asli Dipertahankan) //
 local ScreenGui = Instance.new("ScreenGui")
@@ -64,7 +64,56 @@ local timers = {
     reincarnateDelay = 0.5,
     buyItemDelay = 0.25,
     changeMapDelay = 0.5,
-    fireserver_generic_delay = 0.25
+    fireserver_generic_delay = 0.25,
+
+    -- Waktu tunggu spesifik untuk teleportasi
+    wait_after_camp_teleport = 5 * 60 -- 5 menit
+}
+
+-- --- Tabel Konfigurasi Teleportasi ---
+-- Data ini diambil dari file "script Roblox via executor" Anda
+local teleportLocations = {
+    -- Camp 1
+    ["Camp1"] = {
+        path = "workspace[\"Camp_Main_Tents%\"].Camp1:GetChildren()[11]",
+        cframe = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381)
+    },
+    ["CheckpointCamp1"] = {
+        path = "workspace[\"Checkpoints%\"][\"Camp 1\"].SpawnLocation",
+        cframe = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    },
+    -- Camp 2
+    ["Camp2"] = {
+        path = "workspace[\"Camp_Main_Tents%\"].Camp2:GetChildren()[11]",
+        cframe = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277)
+    },
+    ["CheckpointCamp2"] = {
+        path = "workspace[\"Checkpoints%\"][\"Camp 2\"].SpawnLocation",
+        cframe = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    },
+    -- Camp 3
+    ["Camp3"] = {
+        path = "workspace[\"Camp_Main_Tents%\"][\"Camp3\"]:GetChildren()[13]",
+        cframe = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121)
+    },
+    ["CheckpointCamp3"] = {
+        path = "workspace[\"Checkpoints%\"][\"Camp 3\"].SpawnLocation",
+        cframe = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    },
+    -- Camp 4
+    ["Camp4"] = {
+        path = "workspace[\"Camp_Main_Tents%\"].Camp4.Floor",
+        cframe = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052)
+    },
+    ["CheckpointCamp4"] = {
+        path = "workspace[\"Checkpoints%\"][\"Camp 4\"].SpawnLocation",
+        cframe = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0)
+    },
+    -- South Pole
+    ["CheckpointSouthPole"] = {
+        path = "workspace[\"Checkpoints%\"][\"South Pole\"].SpawnLocation",
+        cframe = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05)
+    },
 }
 
 -- // Parent UI ke player //
@@ -273,64 +322,6 @@ elementsToToggleVisibility = {
     MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
 }
 
--- --- NEW: Teleportation UI Elements ---
-local teleportTitleLabel = Instance.new("TextLabel")
-teleportTitleLabel.Name = "TeleportTitle"
-teleportTitleLabel.Parent = Frame
-teleportTitleLabel.Size = UDim2.new(1, -40, 0, 20)
-teleportTitleLabel.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers + 40) -- Adjust Y position
-teleportTitleLabel.Text = "// TELEPORT_POINTS"
-teleportTitleLabel.Font = Enum.Font.Code
-teleportTitleLabel.TextSize = 14
-teleportTitleLabel.TextColor3 = Color3.fromRGB(80, 255, 80) -- Green
-teleportTitleLabel.BackgroundTransparency = 1
-teleportTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-teleportTitleLabel.ZIndex = 2
-table.insert(elementsToToggleVisibility, teleportTitleLabel)
-
-local function createTeleportButton(name, yPos, buttonText)
-    local button = Instance.new("TextButton")
-    button.Name = name .. "Button"
-    button.Parent = Frame
-    button.Size = UDim2.new(0.48, -25, 0, 25) -- Adjusted size
-    button.Position = UDim2.new(0, 20, 0, yPos + teleportTitleLabel.Position.Y.Offset + 25) -- Relative to teleport title
-    button.Text = buttonText
-    button.Font = Enum.Font.SourceSansBold
-    button.TextSize = 12
-    button.TextColor3 = Color3.fromRGB(200, 220, 255)
-    button.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    button.BorderColor3 = Color3.fromRGB(100, 100, 120)
-    button.BorderSizePixel = 1
-    button.ZIndex = 2
-
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 5)
-    ButtonCorner.Parent = button
-
-    table.insert(elementsToToggleVisibility, button) -- Add to toggle list
-    return button
-end
-
-local tpBtnY = 0 -- Relative Y position for teleport buttons
-local tpBtn1 = createTeleportButton("TeleportBasecamp", tpBtnY, "TP: Basecamp")
-tpBtnY = tpBtnY + 30
-local tpBtn2 = createTeleportButton("TeleportCamp1", tpBtnY, "TP: Camp 1")
-tpBtnY = tpBtnY + 30
-local tpBtn3 = createTeleportButton("TeleportCamp2", tpBtnY, "TP: Camp 2")
-tpBtnY = tpBtnY + 30
-local tpBtn4 = createTeleportButton("TeleportCamp3", tpBtnY, "TP: Camp 3")
-tpBtnY = tpBtnY + 30
-local tpBtn5 = createTeleportButton("TeleportCamp4", tpBtnY, "TP: Camp 4")
-tpBtnY = tpBtnY + 30
-local tpBtn6 = createTeleportButton("TeleportSouthPole", tpBtnY, "TP: South Pole")
-tpBtnY = tpBtnY + 30
-local tpBtn7 = createTeleportButton("DrinkWater", tpBtnY, "Drink Water")
-
--- Adjust originalFrameSize to accommodate new buttons if needed
-originalFrameSize = UDim2.new(0, 260, 0, currentYConfig + yOffsetForTimers + 40 + tpBtnY + 30)
-Frame.Size = originalFrameSize -- Apply the new size immediately
-
-
 -- // Fungsi Bantu UI //
 local function updateStatus(text)
     if StatusLabel and StatusLabel.Parent then StatusLabel.Text = "STATUS: " .. string.upper(text) end
@@ -426,48 +417,29 @@ local function fireRemoteEnhanced(remoteName, pathType, ...)
     return success
 end
 
--- --- NEW: Teleportation Function ---
-local localPlayer = game:GetService("Players").LocalPlayer
-local function teleportPlayer(targetPart)
-    if not localPlayer or not localPlayer.Character then
-        updateStatus("Teleport_Fail: No Character")
-        return
-    end
-    local humanoidRootPart = localPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart and targetPart and targetPart:IsA("BasePart") then
-        local targetPosition = targetPart.Position
-        humanoidRootPart.CFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0)) -- Add a small offset to avoid clipping
-        updateStatus("Teleported to: " .. targetPart.Name)
-        return true
-    elseif humanoidRootPart and targetPart and targetPart:IsA("Model") and targetPart.PrimaryPart then
-        local targetPosition = targetPart.PrimaryPart.Position
-        humanoidRootPart.CFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0))
-        updateStatus("Teleported to: " .. targetPart.Name)
-        return true
-    else
-        updateStatus("Teleport_Fail: Invalid Target")
+-- // Fungsi Teleportasi //
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local function teleportToCFrame(targetCFrame, locationName)
+    if not localPlayer or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        updateStatus("Teleport_Fail: No_Character")
+        warn("Teleport failed: LocalPlayer character or HumanoidRootPart not found.")
         return false
     end
-end
 
--- --- NEW: Water Bottle Function ---
-local function drinkWater()
-    local character = localPlayer.Character
-    if character then
-        local waterBottle = character:WaitForChild("Water Bottle", 5)
-        if waterBottle then
-            local remoteEvent = waterBottle:WaitForChild("RemoteEvent", 5)
-            if remoteEvent then
-                remoteEvent:FireServer()
-                updateStatus("Drank water.")
-            else
-                updateStatus("Water_Bottle_Remote_Not_Found")
-            end
-        else
-            updateStatus("Water_Bottle_Not_Found")
-        end
+    local hrp = localPlayer.Character.HumanoidRootPart
+    local success = pcall(function()
+        hrp.CFrame = targetCFrame
+    end)
+
+    if success then
+        updateStatus("Teleporting: " .. (locationName or "Unknown Location"))
+        return true
     else
-        updateStatus("Character_Not_Found")
+        updateStatus("Teleport_Fail: " .. (locationName or "Unknown Location"))
+        warn("Error teleporting to " .. (locationName or "Unknown Location") .. ": " .. tostring(success))
+        return false
     end
 end
 
@@ -525,6 +497,65 @@ local function runCycle()
         if not fireRemoteEnhanced("HiddenRemote", "AreaEvents", {}) then scriptRunning = false; return end
     else updateStatus("HiddenRemote_Skip (QI_Inactive)") end
     task.wait(timers.genericShortDelay)
+
+    -- --- LOGIKA TELEPORTASI DIMULAI DI SINI ---
+    -- Teleport ke Camp 1
+    updateStatus("Teleporting to Camp 1")
+    if not teleportToCFrame(teleportLocations.Camp1.cframe, "Camp 1") then scriptRunning = false; return end
+    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
+    if not scriptRunning then return end
+
+    -- Teleport ke Checkpoint Camp 1
+    updateStatus("Teleporting to Checkpoint Camp 1")
+    if not teleportToCFrame(teleportLocations.CheckpointCamp1.cframe, "Checkpoint Camp 1") then scriptRunning = false; return end
+    task.wait(timers.genericShortDelay) -- Jeda singkat setelah teleport
+    if not scriptRunning then return end
+
+    -- Teleport ke Camp 2
+    updateStatus("Teleporting to Camp 2")
+    if not teleportToCFrame(teleportLocations.Camp2.cframe, "Camp 2") then scriptRunning = false; return end
+    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
+    if not scriptRunning then return end
+
+    -- Teleport ke Checkpoint Camp 2
+    updateStatus("Teleporting to Checkpoint Camp 2")
+    if not teleportToCFrame(teleportLocations.CheckpointCamp2.cframe, "Checkpoint Camp 2") then scriptRunning = false; return end
+    task.wait(timers.genericShortDelay)
+    if not scriptRunning then return end
+
+    -- Teleport ke Camp 3
+    updateStatus("Teleporting to Camp 3")
+    if not teleportToCFrame(teleportLocations.Camp3.cframe, "Camp 3") then scriptRunning = false; return end
+    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
+    if not scriptRunning then return end
+
+    -- Teleport ke Checkpoint Camp 3
+    updateStatus("Teleporting to Checkpoint Camp 3")
+    if not teleportToCFrame(teleportLocations.CheckpointCamp3.cframe, "Checkpoint Camp 3") then scriptRunning = false; return end
+    task.wait(timers.genericShortDelay)
+    if not scriptRunning then return end
+
+    -- Teleport ke Camp 4
+    updateStatus("Teleporting to Camp 4")
+    if not teleportToCFrame(teleportLocations.Camp4.cframe, "Camp 4") then scriptRunning = false; return end
+    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
+    if not scriptRunning then return end
+
+    -- Teleport ke Checkpoint Camp 4
+    updateStatus("Teleporting to Checkpoint Camp 4")
+    if not teleportToCFrame(teleportLocations.CheckpointCamp4.cframe, "Checkpoint Camp 4") then scriptRunning = false; return end
+    task.wait(timers.genericShortDelay)
+    if not scriptRunning then return end
+
+    -- Teleport ke Checkpoint South Pole
+    updateStatus("Teleporting to Checkpoint South Pole")
+    waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
+    if not scriptRunning then return end
+    if not teleportToCFrame(teleportLocations.CheckpointSouthPole.cframe, "Checkpoint South Pole") then scriptRunning = false; return end
+    task.wait(timers.genericShortDelay)
+    if not scriptRunning then return end
+    -- --- LOGIKA TELEPORTASI BERAKHIR DI SINI ---
+
     updateStatus("Forbidden_Zone_Prep (Direct)")
     if not scriptRunning then return end
     updateStatus("Forbidden_Zone_Enter")
@@ -631,40 +662,6 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     updateStatus(originalStatus)
 end)
 
--- --- NEW: Teleportation Button Connections ---
-tpBtn1.MouseButton1Click:Connect(function()
-    local target = workspace:FindFirstChild("Search_And_Rescue%"):FindFirstChild("Helicopter_Spawn_Clickers"):FindFirstChild("Basecamp")
-    if target then teleportPlayer(target) else updateStatus("Target 'Basecamp' not found!") end
-end)
-
-tpBtn2.MouseButton1Click:Connect(function()
-    local target = workspace:FindFirstChild("Camp_Main_Tents%"):FindFirstChild("Camp1")
-    if target then teleportPlayer(target) else updateStatus("Target 'Camp1' not found!") end
-end)
-
-tpBtn3.MouseButton1Click:Connect(function()
-    local target = workspace:FindFirstChild("Camp_Main_Tents%"):FindFirstChild("Camp2")
-    if target then teleportPlayer(target) else updateStatus("Target 'Camp2' not found!") end
-end)
-
-tpBtn4.MouseButton1Click:Connect(function()
-    local target = workspace:FindFirstChild("Camp_Main_Tents%"):FindFirstChild("Camp3")
-    if target then teleportPlayer(target) else updateStatus("Target 'Camp3' not found!") end
-end)
-
-tpBtn5.MouseButton1Click:Connect(function()
-    local target = workspace:FindFirstChild("Camp_Main_Tents%"):FindFirstChild("Camp4")
-    if target then teleportPlayer(target) else updateStatus("Target 'Camp4' not found!") end
-end)
-
-tpBtn6.MouseButton1Click:Connect(function()
-    local target = workspace:FindFirstChild("Checkpoints%"):FindFirstChild("South Pole"):FindFirstChild("SpawnLocation")
-    if target then teleportPlayer(target) else updateStatus("Target 'South Pole SpawnLocation' not found!") end
-end)
-
-tpBtn7.MouseButton1Click:Connect(drinkWater) -- Connect the Drink Water button
-
-
 -- --- ANIMASI UI ---
 -- Menggunakan task.spawn() untuk memastikan animasi berjalan di thread terpisah.
 -- task.spawn() umumnya lebih andal dan direkomendasikan daripada spawn() lama.
@@ -761,7 +758,7 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
 end)
 
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
-    local buttonsToAnimate = {StartButton, ApplyTimersButton, MinimizeButton, tpBtn1, tpBtn2, tpBtn3, tpBtn4, tpBtn5, tpBtn6, tpBtn7} -- Add new buttons
+    local buttonsToAnimate = {StartButton, ApplyTimersButton, MinimizeButton}
     while ScreenGui and ScreenGui.Parent do
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             for _, btn in ipairs(buttonsToAnimate) do
@@ -801,6 +798,6 @@ game:BindToClose(function()
 end)
 
 -- Inisialisasi
-print("Skrip Otomatisasi (Versi UI Canggih) Telah Dimuat.")
+print("Skrip Otomatisasi (Versi UI Canggih dengan Teleportasi) Telah Dimuat.")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
