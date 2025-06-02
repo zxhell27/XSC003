@@ -1,6 +1,6 @@
 -- MainScript.lua - Gabungan UI dan Logika Teleportasi Otomatis
 -- Dibuat berdasarkan referensi mainv2.lua dan script Roblox via executor
--- Disesuaikan untuk game "Ekspedisi Antartika"
+-- Disesuaikan untuk game "Ekspedisi Antartika" dengan perbaikan bug UI dan teleportasi
 
 -- // UI FRAME (Struktur Asli Dipertahankan) //
 local ScreenGui = Instance.new("ScreenGui")
@@ -38,9 +38,8 @@ local mainCycleThread = nil -- Thread utama untuk siklus teleportasi
 local isMinimized = false
 local originalFrameSize = UDim2.new(0, 260, 0, 250) -- Ukuran UI disesuaikan karena timer input berkurang
 local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
-local minimizedZLabel = Instance.new("TextLabel") -- Label khusus untuk pop-up 'Z'
 
--- Kumpulan elemen yang visibilitasnya akan di-toggle
+-- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton TIDAK termasuk di sini)
 local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibuat
 
 -- --- Tabel Konfigurasi Timer ---
@@ -49,48 +48,65 @@ local timers = {
     genericShortDelay = 0.5,
 }
 
--- --- Konfigurasi Teleportasi untuk "Ekspedisi Antartika" ---
--- PENTING: Path dan CFrame ini adalah CONTOH. Anda mungkin perlu
--- menggunakan alat seperti Dex Explorer di game untuk menemukan
--- path dan koordinat CFrame yang akurat dari lokasi di "Ekspedisi Antartika".
+-- --- Konfigurasi Teleportasi (Disesuaikan kembali ke alur asli dari referensi Anda) ---
 local teleportSequence = {
     {
-        name = "Base Camp",
-        path = "Workspace.Antarctica.BaseCamp.SpawnLocation", -- Contoh path
-        cframe = CFrame.new(0, 100, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1), -- Contoh CFrame
+        name = "Camp 1 Main Tent",
+        path = "Camp_Main_Tents%.Camp1",
+        childIndex = 11,
+        cframe = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Ice Cave Entrance",
-        path = "Workspace.Antarctica.IceCave.Entrance", -- Contoh path
-        cframe = CFrame.new(1000, 50, 500, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+        name = "Camp 1 Checkpoint",
+        path = "Checkpoints%.Camp 1.SpawnLocation",
+        cframe = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Research Outpost",
-        path = "Workspace.Structures.ResearchOutpost.MainBuilding", -- Contoh path
-        cframe = CFrame.new(2500, 200, 1000, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+        name = "Camp 2 Main Tent",
+        path = "Camp_Main_Tents%.Camp2",
+        childIndex = 11,
+        cframe = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Glacier Peak Summit",
-        path = "Workspace.Mountains.GlacierPeak.Summit", -- Contoh path
-        cframe = CFrame.new(4000, 500, 1500, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+        name = "Camp 2 Checkpoint",
+        path = "Checkpoints%.Camp 2.SpawnLocation",
+        cframe = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Penguin Colony",
-        path = "Workspace.Wildlife.PenguinColony.Center", -- Contoh path
-        cframe = CFrame.new(5000, 50, 2000, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+        name = "Camp 3 Main Tent",
+        path = "Camp_Main_Tents%.Camp3",
+        childIndex = 13,
+        cframe = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Ancient Ruin",
-        path = "Workspace.Ruins.AncientRuin.Entrance", -- Contoh path
-        cframe = CFrame.new(6500, 75, 2500, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+        name = "Camp 3 Checkpoint",
+        path = "Checkpoints%.Camp 3.SpawnLocation",
+        cframe = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0),
         waitAfter = 300 -- 5 menit
     },
-    -- Anda bisa menambahkan lebih banyak lokasi di sini sesuai kebutuhan game
+    {
+        name = "Camp 4 Floor",
+        path = "Camp_Main_Tents%.Camp4.Floor",
+        cframe = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052),
+        waitAfter = 300 -- 5 menit
+    },
+    {
+        name = "Camp 4 Checkpoint",
+        path = "Checkpoints%.Camp 4.SpawnLocation",
+        cframe = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        waitAfter = 300 -- 5 menit
+    },
+    {
+        name = "South Pole Checkpoint",
+        path = "Checkpoints%.South Pole.SpawnLocation",
+        cframe = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05),
+        waitAfter = 300 -- 5 menit
+    },
 }
 
 
@@ -113,7 +129,7 @@ local function setupCoreGuiParenting()
     MinimizeButton.Parent = Frame
     TimerTitleLabel.Parent = Frame
     ApplyTimersButton.Parent = Frame
-    minimizedZLabel.Parent = Frame -- Parentkan label Z ke Frame
+    -- minimizedZLabel dihapus karena MinimizeButton akan mengambil alih perannya
 end
 
 -- Panggil setupCoreGuiParenting di awal
@@ -258,40 +274,34 @@ ApplyButtonCorner.CornerRadius = UDim.new(0, 5)
 ApplyButtonCorner.Parent = ApplyTimersButton
 
 -- --- Tombol Minimize ---
-MinimizeButton.Size = UDim2.new(0, 25, 0, 25)
-MinimizeButton.Position = UDim2.new(1, -35, 0, 10)
-MinimizeButton.Text = "_" -- Simbol minimize
+local originalMinimizeButtonSize = UDim2.new(0, 25, 0, 25)
+local originalMinimizeButtonPosition = UDim2.new(1, -35, 0, 10)
+local originalMinimizeButtonText = "_"
+local originalMinimizeButtonTextSize = 20
+local originalMinimizeButtonTextColor = Color3.fromRGB(180, 180, 180)
+local originalMinimizeButtonBgColor = Color3.fromRGB(50, 50, 60)
+local originalMinimizeButtonBorderColor = Color3.fromRGB(100,100,120)
+local originalMinimizeButtonZIndex = 3
+
+MinimizeButton.Size = originalMinimizeButtonSize
+MinimizeButton.Position = originalMinimizeButtonPosition
+MinimizeButton.Text = originalMinimizeButtonText -- Simbol minimize
 MinimizeButton.Font = Enum.Font.SourceSansBold
-MinimizeButton.TextSize = 20
-MinimizeButton.TextColor3 = Color3.fromRGB(180, 180, 180)
-MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-MinimizeButton.BorderColor3 = Color3.fromRGB(100,100,120)
+MinimizeButton.TextSize = originalMinimizeButtonTextSize
+MinimizeButton.TextColor3 = originalMinimizeButtonTextColor
+MinimizeButton.BackgroundColor3 = originalMinimizeButtonBgColor
+MinimizeButton.BorderColor3 = originalMinimizeButtonBorderColor
 MinimizeButton.BorderSizePixel = 1
-MinimizeButton.ZIndex = 3
+MinimizeButton.ZIndex = originalMinimizeButtonZIndex
 
 local MinimizeButtonCorner = Instance.new("UICorner")
 MinimizeButtonCorner.CornerRadius = UDim.new(0, 3)
 MinimizeButtonCorner.Parent = MinimizeButton
 
--- --- Pop-up 'Z' (Baru) ---
-minimizedZLabel.Size = UDim2.new(1, 0, 1, 0) -- Akan mengisi seluruh Frame saat minimized
-minimizedZLabel.Position = UDim2.new(0,0,0,0)
-minimizedZLabel.Text = "Z"
-minimizedZLabel.Font = Enum.Font.SourceSansBold
-minimizedZLabel.TextScaled = false
-minimizedZLabel.TextSize = 40 -- Ukuran besar agar memenuhi pop-up kecil
-minimizedZLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- Merah
-minimizedZLabel.TextXAlignment = Enum.TextXAlignment.Center
-minimizedZLabel.TextYAlignment = Enum.TextYAlignment.Center
-minimizedZLabel.BackgroundTransparency = 1
-minimizedZLabel.ZIndex = 4 -- Pastikan di atas semua
-minimizedZLabel.Visible = false -- Awalnya sembunyi
-
--- Kumpulan elemen yang visibilitasnya akan di-toggle
+-- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton TIDAK termasuk di sini)
 elementsToToggleVisibility = {
     UiTitleLabel, StartButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
     timerInputElements.WaitAfterTeleportLabel, timerInputElements.WaitAfterTeleportInput,
-    MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
 }
 
 -- // Fungsi Bantu UI //
@@ -308,22 +318,27 @@ local function animateFrame(targetSize, targetPosition, callback)
     tween:Play()
     if callback then
         tween.Completed:Wait()
-        callback()
     end
 end
 
--- // Fungsi Minimize/Maximize UI //
+-- // Fungsi Minimize/Maximize UI (Diperbaiki) //
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
-        -- Simpan posisi original Frame sebelum diubah
-        local originalFramePosition = Frame.Position
-
-        -- Sembunyikan semua elemen kecuali Frame dan 'Z' label
+        -- Sembunyikan semua elemen kecuali Frame dan MinimizeButton
         for _, element in ipairs(elementsToToggleVisibility) do
             if element and element.Parent then element.Visible = false end
         end
-        minimizedZLabel.Visible = true -- Tampilkan 'Z'
+
+        -- Ubah MinimizeButton menjadi pop-up 'Z'
+        MinimizeButton.Text = "Z"
+        MinimizeButton.TextSize = 40
+        MinimizeButton.TextColor3 = Color3.fromRGB(255, 0, 0) -- Merah
+        MinimizeButton.BackgroundColor3 = Color3.fromRGB(15, 15, 20) -- Sama dengan frame
+        MinimizeButton.BorderColor3 = Color3.fromRGB(255, 0, 0)
+        MinimizeButton.ZIndex = 4 -- Pastikan di atas semua
+        MinimizeButton.Size = UDim2.new(1, 0, 1, 0) -- Isi seluruh Frame
+        MinimizeButton.Position = UDim2.new(0,0,0,0) -- Posisikan di dalam Frame
 
         -- Hitung posisi target pop-up di pojok kanan bawah
         local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02 -- Sedikit dari kanan
@@ -333,13 +348,15 @@ local function toggleMinimize()
         animateFrame(minimizedFrameSize, targetPosition)
         Frame.Draggable = false -- Matikan draggable saat diminimize untuk mencegah pergeseran
     else
-        -- Tampilkan tombol minimize sebelum animasi maximize dimulai
-        for _, element in ipairs(elementsToToggleVisibility) do
-            if element == MinimizeButton and element.Parent then element.Visible = true end
-        end
-
-        minimizedZLabel.Visible = false -- Sembunyikan 'Z'
-        MinimizeButton.Text = "_" -- Kembali ke simbol minimize
+        -- Kembalikan MinimizeButton ke kondisi semula
+        MinimizeButton.Text = originalMinimizeButtonText
+        MinimizeButton.TextSize = originalMinimizeButtonTextSize
+        MinimizeButton.TextColor3 = originalMinimizeButtonTextColor
+        MinimizeButton.BackgroundColor3 = originalMinimizeButtonBgColor
+        MinimizeButton.BorderColor3 = originalMinimizeButtonBorderColor
+        MinimizeButton.ZIndex = originalMinimizeButtonZIndex
+        MinimizeButton.Size = originalMinimizeButtonSize
+        MinimizeButton.Position = originalMinimizeButtonPosition
 
         -- Posisikan kembali ke tengah layar (gunakan originalFrameSize untuk posisi yang benar)
         local targetPosition = UDim2.new(0.5, -originalFrameSize.X.Offset/2, 0.5, -originalFrameSize.Y.Offset/2)
@@ -441,22 +458,31 @@ local function runTeleportCycle()
 
         local targetInstance = nil
         if step.path then
-            -- Coba cari objek dengan fungsi findObject
-            targetInstance = findObject(game.Workspace, step.path)
-            if targetInstance then
-                print("Objek target ditemukan melalui path: " .. targetInstance.Name)
-                -- Jika ada childIndex, coba ambil child spesifik (hanya berlaku jika targetInstance adalah Model)
-                if step.childIndex and targetInstance:IsA("Model") and #targetInstance:GetChildren() >= step.childIndex then
-                    local specificChild = targetInstance:GetChildren()[step.childIndex]
-                    if specificChild:IsA("BasePart") or specificChild:IsA("Model") then
-                        targetInstance = specificChild -- Gunakan child spesifik jika itu BasePart atau Model
-                        print("Objek target spesifik ditemukan melalui indeks anak: " .. targetInstance.Name)
+            local potentialParent = findObject(game.Workspace, step.path)
+            if potentialParent then
+                print("Objek potensial ditemukan melalui path: " .. potentialParent.Name)
+                if step.childIndex then
+                    -- Jika childIndex ditentukan, coba cari anak spesifik
+                    local children = potentialParent:GetChildren()
+                    if step.childIndex > 0 and step.childIndex <= #children then
+                        local specificChild = children[step.childIndex]
+                        if specificChild and (specificChild:IsA("BasePart") or (specificChild:IsA("Model") and specificChild.PrimaryPart)) then
+                            targetInstance = specificChild
+                            print("Objek target spesifik ditemukan melalui indeks anak: " .. targetInstance.Name)
+                        else
+                            warn("Anak pada indeks " .. step.childIndex .. " tidak valid (bukan BasePart/Model dengan PrimaryPart). Menggunakan induk.")
+                            targetInstance = potentialParent -- Fallback ke induk jika anak tidak valid
+                        end
                     else
-                        warn("Anak pada indeks " .. step.childIndex .. " bukan BasePart atau Model. Menggunakan CFrame dari induk.")
+                        warn("Indeks anak tidak valid atau di luar batas (" .. step.childIndex .. "). Menggunakan induk.")
+                        targetInstance = potentialParent -- Fallback ke induk jika indeks tidak valid
                     end
+                else
+                    -- Tidak ada childIndex, gunakan objek yang ditemukan
+                    targetInstance = potentialParent
                 end
             else
-                warn("Tidak dapat menemukan objek target melalui path: " .. step.path .. ". Menggunakan CFrame fallback.")
+                warn("Tidak dapat menemukan objek target melalui path: " .. step.path .. ". Menggunakan CFrame fallback yang ditentukan.")
             end
         end
 
@@ -624,18 +650,23 @@ end)
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     local buttonsToAnimate = {StartButton, ApplyTimersButton, MinimizeButton}
     while ScreenGui and ScreenGui.Parent do
-        if not isMinimized then -- Hanya beranimasi saat tidak diminimize
-            for _, btn in ipairs(buttonsToAnimate) do
-                if btn and btn.Parent then
-                    local originalBorder = btn.BorderColor3
+        -- Animasi ini harus selalu berjalan, terlepas dari isMinimized,
+        -- karena MinimizeButton sekarang mengambil peran 'Z' saat diminimize.
+        for _, btn in ipairs(buttonsToAnimate) do
+            if btn and btn.Parent then
+                local originalBorder = btn.BorderColor3
 
-                    -- Efek hover/pulse sederhana pada border
-                    if btn.Name == "StartButton" and scriptRunning then
-                        btn.BorderColor3 = Color3.fromRGB(255,100,100) -- Merah lebih terang saat running
-                    else
-                        local h,s,v = Color3.toHSV(originalBorder)
-                        btn.BorderColor3 = Color3.fromHSV(h,s, math.sin(tick()*2)*0.1 + 0.9) -- Pulse V
-                    end
+                -- Efek hover/pulse sederhana pada border
+                if btn.Name == "StartButton" and scriptRunning then
+                    btn.BorderColor3 = Color3.fromRGB(255,100,100) -- Merah lebih terang saat running
+                elseif btn.Name == "MinimizeButton" and isMinimized then
+                    -- Animasi khusus untuk tombol minimize saat menjadi 'Z'
+                    local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
+                    btn.TextColor3 = Color3.fromHSV(hue, 1, 1)
+                    btn.BorderColor3 = Color3.fromHSV(hue, 1, 1) -- Border juga ikut berkedip
+                else
+                    local h,s,v = Color3.toHSV(originalBorder)
+                    btn.BorderColor3 = Color3.fromHSV(h,s, math.sin(tick()*2)*0.1 + 0.9) -- Pulse V
                 end
             end
         end
@@ -643,15 +674,15 @@ task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     end
 end)
 
-task.spawn(function() -- Animasi Pop-up 'Z' (RGB Pulse)
-    while ScreenGui and ScreenGui.Parent do
-        if isMinimized and minimizedZLabel.Visible then
-            local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
-            minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
-        end
-        task.wait(0.05)
-    end
-end)
+-- task.spawn(function() -- Animasi Pop-up 'Z' (RGB Pulse) - Dihapus karena MinimizeButton mengambil alih
+--     while ScreenGui and ScreenGui.Parent do
+--         if isMinimized and minimizedZLabel.Visible then
+--             local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
+--             minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+--         end
+--         task.wait(0.05)
+--     end
+-- end)
 -- --- END ANIMASI UI ---
 
 -- BindToClose
