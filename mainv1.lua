@@ -69,7 +69,7 @@ local originalFrameSize = UDim2.new(0, 300, 0, 550) -- Ukuran UI disesuaikan
 local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
 local minimizedZLabel = Instance.new("TextLabel") -- Label khusus untuk pop-up 'Z'
 
--- Kumpulan elemen yang visibilitasnya akan di-toggle
+-- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton DIKECUALIKAN)
 local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibuat
 
 -- --- Tabel Konfigurasi Timer ---
@@ -369,28 +369,11 @@ local TeleportButtonCorner = Instance.new("UICorner")
 TeleportButtonCorner.CornerRadius = UDim.new(0, 5)
 TeleportButtonCorner.Parent = TeleportButton
 
--- Definisi padding antara ManualTeleportFrame dan LogFrame
-local PADDING_BETWEEN_MANUAL_TP_AND_LOG = 10
-
--- Fungsi untuk memperbarui posisi LogFrame secara dinamis
-local function updateLogFramePosition()
-    -- Hitung posisi Y LogFrame berdasarkan posisi dan ukuran ManualTeleportFrame
-    local logFrameY = ManualTeleportFrame.Position.Y.Offset + ManualTeleportFrame.Size.Y.Offset + PADDING_BETWEEN_MANUAL_TP_AND_LOG
-
-    -- Jika dropdown terlihat, tambahkan tinggi dropdown dan padding tambahan
-    if TeleportDropdownOptionsFrame.Visible then
-        logFrameY = logFrameY + TeleportDropdownOptionsFrame.Size.Y.Offset + 5 -- Padding tambahan untuk dropdown
-    end
-    LogFrame.Position = UDim2.new(0, 20, 0, logFrameY)
-end
-
--- Panggil fungsi ini di awal untuk memposisikan LogFrame dengan benar
--- (Ini akan dipanggil setelah semua UI diinisialisasi)
--- updateLogFramePosition() -- Akan dipanggil di bagian inisialisasi akhir
+local yOffsetForLog = yOffsetForManualTeleport + 130
 
 -- --- Log Section ---
 LogFrame.Size = UDim2.new(1, -40, 0, 100)
--- LogFrame.Position akan diatur oleh updateLogFramePosition()
+LogFrame.Position = UDim2.new(0, 20, 0, yOffsetForLog)
 LogFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 LogFrame.BorderSizePixel = 1
 LogFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
@@ -458,6 +441,7 @@ minimizedZLabel.ZIndex = 4 -- Pastikan di atas semua
 minimizedZLabel.Visible = false -- Awalnya sembunyi
 
 -- Kumpulan elemen yang visibilitasnya akan di-toggle
+-- BUG FIX: MinimizeButton tidak lagi termasuk dalam daftar ini agar selalu terlihat atau dikelola terpisah.
 elementsToToggleVisibility = {
     UiTitleLabel, StartAutoTeleportButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
     timerInputElements.teleportWaitTimeLabel, timerInputElements.teleportWaitTimeInput,
@@ -465,7 +449,7 @@ elementsToToggleVisibility = {
     timerInputElements.WaterRefillDurationLabel, timerInputElements.WaterRefillDurationInput,
     timerInputElements.WaterDrinkIntervalLabel, timerInputElements.WaterDrinkIntervalInput,
     timerInputElements.WaterDrinkCountLabel, timerInputElements.WaterDrinkCountInput,
-    ManualTeleportFrame, LogFrame, MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
+    ManualTeleportFrame, LogFrame
 }
 
 -- // Fungsi Bantu UI //
@@ -510,13 +494,11 @@ end
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
-        -- Simpan posisi original Frame sebelum diubah
-        local originalFramePosition = Frame.Position
-
         -- Sembunyikan semua elemen kecuali Frame dan 'Z' label
         for _, element in ipairs(elementsToToggleVisibility) do
             if element and element.Parent then element.Visible = false end
         end
+        MinimizeButton.Visible = false -- Sembunyikan tombol minimize saat mode 'Z' aktif
         minimizedZLabel.Visible = true -- Tampilkan 'Z'
 
         -- Hitung posisi target pop-up di pojok kanan bawah
@@ -528,10 +510,7 @@ local function toggleMinimize()
         Frame.Draggable = false -- Matikan draggable saat diminimize untuk mencegah pergeseran
     else
         -- Tampilkan tombol minimize sebelum animasi maximize dimulai
-        for _, element in ipairs(elementsToToggleVisibility) do
-            if element == MinimizeButton and element.Parent then element.Visible = true end
-        end
-
+        MinimizeButton.Visible = true -- Tampilkan kembali tombol minimize
         minimizedZLabel.Visible = false -- Sembunyikan 'Z'
         MinimizeButton.Text = "_" -- Kembali ke simbol minimize
 
@@ -548,6 +527,7 @@ local function toggleMinimize()
 end
 
 MinimizeButton.MouseButton1Click:Connect(toggleMinimize)
+minimizedZLabel.MouseButton1Click:Connect(toggleMinimize) -- Menambahkan event listener untuk label 'Z'
 
 -- // Fungsi tunggu //
 local function waitSeconds(sec)
@@ -568,7 +548,7 @@ local function teleportPlayer(cframeTarget, locationName)
                 LocalPlayer.Character.Archivable = true
                 local originalCanCollide = {}
                 for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
+                    if part:IsA("BasePart") and part.CanCollide then -- Hanya simpan yang CanCollide
                         originalCanCollide[part] = part.CanCollide
                         part.CanCollide = false
                     end
@@ -597,7 +577,7 @@ local function teleportPlayer(cframeTarget, locationName)
         return false
     end
     return true
-}
+end
 
 -- Fungsi untuk mengisi air
 local function refillWater(campName)
@@ -830,9 +810,8 @@ local function populateDropdownOptions()
             optionButton.MouseButton1Click:Connect(function()
                 TeleportLocationSelector.Text = locationName
                 TeleportDropdownOptionsFrame.Visible = false
-                -- Reset button position after selection
+                -- BUG FIX: Pastikan posisi TeleportButton direset saat dropdown ditutup
                 TeleportButton.Position = UDim2.new(0, 10, 0, 80)
-                updateLogFramePosition() -- Perbarui posisi LogFrame setelah menutup dropdown
             end)
         end
     end
@@ -844,21 +823,20 @@ end
 TeleportLocationSelector.MouseButton1Click:Connect(function()
     if TeleportDropdownOptionsFrame.Visible then
         TeleportDropdownOptionsFrame.Visible = false
-        -- Reset button position when closing dropdown
+        -- BUG FIX: Pastikan posisi TeleportButton direset saat dropdown ditutup
         TeleportButton.Position = UDim2.new(0, 10, 0, 80)
     else
         populateDropdownOptions()
-        -- Calculate position relative to the selector's absolute position
-        local selectorAbsolutePos = TeleportLocationSelector.AbsolutePosition
-        local frameAbsolutePos = Frame.AbsolutePosition
-        local relativeX = selectorAbsolutePos.X - frameAbsolutePos.X
-        local relativeY = selectorAbsolutePos.Y - frameAbsolutePos.Y + TeleportLocationSelector.Size.Y.Offset + 5 -- 5 for padding
+        -- BUG FIX: Hitung posisi dropdown relatif terhadap MainFrame, bukan AbsolutePosition
+        local selectorRelativePos = TeleportLocationSelector.Position
+        local manualFrameRelativePos = ManualTeleportFrame.Position
+        local relativeX = manualFrameRelativePos.X.Offset + selectorRelativePos.X.Offset
+        local relativeY = manualFrameRelativePos.Y.Offset + selectorRelativePos.Y.Offset + TeleportLocationSelector.Size.Y.Offset + 5 -- 5 for padding
         TeleportDropdownOptionsFrame.Position = UDim2.new(0, relativeX, 0, relativeY)
         TeleportDropdownOptionsFrame.Visible = true
         -- Move the Teleport button down to make space for the dropdown
         TeleportButton.Position = UDim2.new(0, 10, 0, 80 + TeleportDropdownOptionsFrame.Size.Y.Offset + 5)
     end
-    updateLogFramePosition() -- Panggil update setelah perubahan visibilitas dropdown
 end)
 
 -- Hide dropdown if user clicks outside
@@ -881,7 +859,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if TeleportDropdownOptionsFrame.Visible and not isClickInsideDropdown and not isClickInsideSelector then
             TeleportDropdownOptionsFrame.Visible = false
             TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
-            updateLogFramePosition() -- Panggil update setelah menyembunyikan dropdown
         end
     end
 end)
@@ -957,7 +934,8 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
                 Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
                 Frame.BorderSizePixel = math.random(1, 5)
                 Frame.BackgroundTransparency = 0 -- Reset transparency
-                Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Reset position
+                -- BUG FIX: Pastikan posisi Frame direset ke tengah setelah glitch
+                Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) 
                 task.wait(0.05)
             elseif r < 0.4 then -- Glitch ringan (lebih sering)
                 Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random())
@@ -974,12 +952,15 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
             -- Animasi border utama (HSV shift) yang lebih halus saat tidak glitch intens
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
             Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v)
-        else -- Jika diminize, pastikan warna kembali normal untuk 'Z'
+        else -- Jika diminimize, pastikan warna kembali normal untuk 'Z'
             Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
             Frame.BorderSizePixel = borderThicknessBase
             Frame.BackgroundTransparency = 0
-            Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Ensure position is reset
+            -- BUG FIX: Pastikan posisi Frame direset ke posisi minimized saat diminimize
+            local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02
+            local targetY = 1 - (minimizedFrameSize.Y.Offset / ScreenGui.AbsoluteSize.Y) - 0.02
+            Frame.Position = UDim2.new(targetX, 0, targetY, 0)
         end
         task.wait(0.05)
     end
@@ -1114,4 +1095,3 @@ end)
 print("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat.")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
-updateLogFramePosition() -- Panggil di akhir inisialisasi untuk memastikan posisi LogFrame yang benar
