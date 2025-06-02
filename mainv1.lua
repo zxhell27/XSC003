@@ -369,11 +369,28 @@ local TeleportButtonCorner = Instance.new("UICorner")
 TeleportButtonCorner.CornerRadius = UDim.new(0, 5)
 TeleportButtonCorner.Parent = TeleportButton
 
-local yOffsetForLog = yOffsetForManualTeleport + 130
+-- Definisi padding antara ManualTeleportFrame dan LogFrame
+local PADDING_BETWEEN_MANUAL_TP_AND_LOG = 10
+
+-- Fungsi untuk memperbarui posisi LogFrame secara dinamis
+local function updateLogFramePosition()
+    -- Hitung posisi Y LogFrame berdasarkan posisi dan ukuran ManualTeleportFrame
+    local logFrameY = ManualTeleportFrame.Position.Y.Offset + ManualTeleportFrame.Size.Y.Offset + PADDING_BETWEEN_MANUAL_TP_AND_LOG
+
+    -- Jika dropdown terlihat, tambahkan tinggi dropdown dan padding tambahan
+    if TeleportDropdownOptionsFrame.Visible then
+        logFrameY = logFrameY + TeleportDropdownOptionsFrame.Size.Y.Offset + 5 -- Padding tambahan untuk dropdown
+    end
+    LogFrame.Position = UDim2.new(0, 20, 0, logFrameY)
+end
+
+-- Panggil fungsi ini di awal untuk memposisikan LogFrame dengan benar
+-- (Ini akan dipanggil setelah semua UI diinisialisasi)
+-- updateLogFramePosition() -- Akan dipanggil di bagian inisialisasi akhir
 
 -- --- Log Section ---
 LogFrame.Size = UDim2.new(1, -40, 0, 100)
-LogFrame.Position = UDim2.new(0, 20, 0, yOffsetForLog)
+-- LogFrame.Position akan diatur oleh updateLogFramePosition()
 LogFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 LogFrame.BorderSizePixel = 1
 LogFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
@@ -580,7 +597,7 @@ local function teleportPlayer(cframeTarget, locationName)
         return false
     end
     return true
-end
+}
 
 -- Fungsi untuk mengisi air
 local function refillWater(campName)
@@ -815,6 +832,7 @@ local function populateDropdownOptions()
                 TeleportDropdownOptionsFrame.Visible = false
                 -- Reset button position after selection
                 TeleportButton.Position = UDim2.new(0, 10, 0, 80)
+                updateLogFramePosition() -- Perbarui posisi LogFrame setelah menutup dropdown
             end)
         end
     end
@@ -840,6 +858,7 @@ TeleportLocationSelector.MouseButton1Click:Connect(function()
         -- Move the Teleport button down to make space for the dropdown
         TeleportButton.Position = UDim2.new(0, 10, 0, 80 + TeleportDropdownOptionsFrame.Size.Y.Offset + 5)
     end
+    updateLogFramePosition() -- Panggil update setelah perubahan visibilitas dropdown
 end)
 
 -- Hide dropdown if user clicks outside
@@ -862,6 +881,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if TeleportDropdownOptionsFrame.Visible and not isClickInsideDropdown and not isClickInsideSelector then
             TeleportDropdownOptionsFrame.Visible = false
             TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
+            updateLogFramePosition() -- Panggil update setelah menyembunyikan dropdown
         end
     end
 end)
@@ -954,7 +974,7 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
             -- Animasi border utama (HSV shift) yang lebih halus saat tidak glitch intens
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
             Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v)
-        else -- Jika diminimize, pastikan warna kembali normal untuk 'Z'
+        else -- Jika diminize, pastikan warna kembali normal untuk 'Z'
             Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
             Frame.BorderSizePixel = borderThicknessBase
@@ -1094,4 +1114,4 @@ end)
 print("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat.")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
-
+updateLogFramePosition() -- Panggil di akhir inisialisasi untuk memastikan posisi LogFrame yang benar
