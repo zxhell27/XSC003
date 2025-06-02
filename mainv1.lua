@@ -351,7 +351,7 @@ local function waitSeconds(sec)
     until not scriptRunning or tick() - startTime >= sec
 end
 
--- Fungsi fireRemoteEnhanced (dipertahankan dari mainv2, meskipun tidak digunakan untuk ekspedisi)
+-- Fungsi fireRemoteEnhanced (dipertahankan dari mainv2, tidak digunakan untuk ekspedisi ini)
 local function fireRemoteEnhanced(remoteName, pathType, ...)
     local argsToUnpack = table.pack(...)
     local remoteEventFolder
@@ -405,6 +405,11 @@ local function teleportTo(targetPart)
         local success, err = pcall(function()
             -- Metode teleportasi umum: mengatur CFrame dari HumanoidRootPart
             humanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0) -- Tambah sedikit offset Y agar tidak terjebak
+            -- Opsional: Set Velocity ke Vector3.new(0,0,0) untuk mencegah pergerakan setelah teleport
+            if character:FindFirstChildOfClass("Humanoid") then
+                character:FindFirstChildOfClass("Humanoid").WalkSpeed = 0 -- Hentikan pergerakan sementara
+                character:FindFirstChildOfClass("Humanoid").JumpPower = 0
+            end
         end)
         if not success then
             warn("Gagal melakukan teleportasi: " .. err)
@@ -412,6 +417,11 @@ local function teleportTo(targetPart)
             return false
         end
         waitSeconds(timers.teleportWait)
+        -- Kembalikan kecepatan setelah teleport
+        if character:FindFirstChildOfClass("Humanoid") then
+            character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16 -- Kecepatan default Roblox
+            character:FindFirstChildOfClass("Humanoid").JumpPower = 50 -- JumpPower default Roblox
+        end
         return true
     else
         warn("Target teleportasi tidak valid atau tidak ditemukan: " .. tostring(targetPart))
@@ -455,78 +465,82 @@ end
 local function runExpeditionCycle()
     updateStatus("STARTING EXPEDITION...")
 
-    -- Langkah 1: Teleport ke Basecamp (hanya sekali di awal eksekusi skrip penuh)
-    -- Ini akan dieksekusi di luar loop utama runExpeditionCycle, saat mainCycleThread pertama kali berjalan.
-    -- Jadi, kita akan memulai loop dari "nomor 2" di dalam while true do.
-
     -- --- Siklus Ekspesisi Berulang (Dimulai dari "nomor 2" dari Alur Script) ---
     while scriptRunning do
-        -- Tunggu 5 detik kemudian teleport ke ini:
-        -- workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp
-        -- Ini adalah teleport awal, jadi kita akan melakukannya di luar loop utama ekspedisi
-        -- dan hanya sekali saat skrip dimulai.
-
         -- Langkah 2: Tunggu 5 detik kemudian teleport ke Camp1
+        -- Alur Script: Tunggu 5 detik kemudian teleport ke sini : workspace["Camp_Main_Tents%"].Camp1
         if not scriptRunning then break end
         updateStatus("WAIT 5S, TP TO CAMP1...")
         waitSeconds(timers.teleportWait)
-        local camp1Part = workspace:FindFirstChild("Camp_Main_Tents%") and workspace["Camp_Main_Tents%"]:FindFirstChild("Camp1")
+        local camp1Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp1")
         if not teleportTo(camp1Part) then break end
 
-        -- Langkah 3: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[264]
+        -- Langkah 3: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 1
+        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[264]
+        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 1"].SpawnLocation
         if not scriptRunning then break end
-        updateStatus("WAIT 5M, TP TO CHECKPOINT_264...")
+        updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP1...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpoint264 = workspace:FindFirstChild("Checkpoint_264") -- ASUMSI NAMA PART
-        if not teleportTo(checkpoint264) then break end
+        local checkpointCamp1 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 1") and game:GetService("Workspace")["Checkpoints%"]["Camp 1"]:FindFirstChild("SpawnLocation")
+        if not teleportTo(checkpointCamp1) then break end
 
         -- Langkah 4: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp2
+        -- Alur Script: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini : workspace["Camp_Main_Tents%"].Camp2
         if not scriptRunning then break end
-        updateStatus("CHECKPOINT_264 REACHED, TP TO CAMP2...")
+        updateStatus("CHECKPOINT CAMP1 REACHED, TP TO CAMP2...")
         waitSeconds(timers.teleportWait)
-        local camp2Part = workspace:FindFirstChild("Camp_Main_Tents%") and workspace["Camp_Main_Tents%"]:FindFirstChild("Camp2")
+        local camp2Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp2")
         if not teleportTo(camp2Part) then break end
 
-        -- Langkah 5: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[731]
+        -- Langkah 5: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 2
+        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[731]
+        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 2"].SpawnLocation
         if not scriptRunning then break end
-        updateStatus("WAIT 5M, TP TO CHECKPOINT_731...")
+        updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP2...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpoint731 = workspace:FindFirstChild("Checkpoint_731") -- ASUMSI NAMA PART
-        if not teleportTo(checkpoint731) then break end
+        local checkpointCamp2 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 2") and game:GetService("Workspace")["Checkpoints%"]["Camp 2"]:FindFirstChild("SpawnLocation")
+        if not teleportTo(checkpointCamp2) then break end
 
         -- Langkah 6: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp3
+        -- Alur Script: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini : workspace["Camp_Main_Tents%"].Camp3
         if not scriptRunning then break end
-        updateStatus("CHECKPOINT_731 REACHED, TP TO CAMP3...")
+        updateStatus("CHECKPOINT CAMP2 REACHED, TP TO CAMP3...")
         waitSeconds(timers.teleportWait)
-        local camp3Part = workspace:FindFirstChild("Camp_Main_Tents%") and workspace["Camp_Main_Tents%"]:FindFirstChild("Camp3")
+        local camp3Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp3")
         if not teleportTo(camp3Part) then break end
 
-        -- Langkah 7: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[550]
+        -- Langkah 7: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 3
+        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace:GetChildren()[550]
+        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 3"].SpawnLocation
         if not scriptRunning then break end
-        updateStatus("WAIT 5M, TP TO CHECKPOINT_550...")
+        updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP3...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpoint550 = workspace:FindFirstChild("Checkpoint_550") -- ASUMSI NAMA PART
-        if not teleportTo(checkpoint550) then break end
+        local checkpointCamp3 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 3") and game:GetService("Workspace")["Checkpoints%"]["Camp 3"]:FindFirstChild("SpawnLocation")
+        if not teleportTo(checkpointCamp3) then break end
 
         -- Langkah 8: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp4
+        -- Alur Script: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini : workspace["Camp_Main_Tents%"].Camp4
         if not scriptRunning then break end
-        updateStatus("CHECKPOINT_550 REACHED, TP TO CAMP4...")
+        updateStatus("CHECKPOINT CAMP3 REACHED, TP TO CAMP4...")
         waitSeconds(timers.teleportWait)
-        local camp4Part = workspace:FindFirstChild("Camp_Main_Tents%") and workspace["Camp_Main_Tents%"]:FindFirstChild("Camp4")
+        local camp4Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp4")
         if not teleportTo(camp4Part) then break end
 
-        -- Langkah 9: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace.Checkpoint *camp 4*
+        -- Langkah 9: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 4
+        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace.Checkpoint *camp 4*
+        -- Menggunakan path yang lebih spesifik dari bagian bawah alur script: workspace["Checkpoints%"]["Camp 4"].SpawnLocation
         if not scriptRunning then break end
-        updateStatus("WAIT 5M, TP TO CHECKPOINT_CAMP4...")
+        updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP4...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpointCamp4 = workspace:FindFirstChild("CheckpointCamp4") -- ASUMSI NAMA PART
+        local checkpointCamp4 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 4") and game:GetService("Workspace")["Checkpoints%"]["Camp 4"]:FindFirstChild("SpawnLocation")
         if not teleportTo(checkpointCamp4) then break end
 
-        -- Langkah 10: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace["Checkpoints%"]["South Pole"].SpawnLocation
+        -- Langkah 10: Tunggu 5 menit kemudian teleport ke cek poin ini: South Pole SpawnLocation
+        -- Alur Script: Tunggu 5 menit kemudian teleport ke cek poin ini: workspace["Checkpoints%"]["South Pole"].SpawnLocation
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO SOUTH_POLE_SPAWN...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local southPoleSpawn = workspace:FindFirstChild("Checkpoints%") and workspace["Checkpoints%"]:FindFirstChild("South Pole") and workspace["Checkpoints%"]["South Pole"]:FindFirstChild("SpawnLocation")
+        local southPoleSpawn = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("South Pole") and game:GetService("Workspace")["Checkpoints%"]["South Pole"]:FindFirstChild("SpawnLocation")
         if not teleportTo(southPoleSpawn) then break end
 
         -- Langkah 11: Minum air setiap 7 menit (ditangani oleh waterDrinkThread terpisah)
@@ -572,7 +586,8 @@ StartButton.MouseButton1Click:Connect(function()
         updateStatus("INIT EXPEDITION...")
 
         -- Teleport awal ke Basecamp (Langkah 1 dari alur)
-        local basecampPart = workspace:FindFirstChild("Search_And_Rescue%") and workspace["Search_And_Rescue%"]:FindFirstChild("Helicopter_Spawn_Clickers") and workspace["Search_And_Rescue%"]["Helicopter_Spawn_Clickers"]:FindFirstChild("Basecamp")
+        -- Alur Script: Tunggu 5 detik kemudian teleport ke ini : workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp
+        local basecampPart = game:GetService("Workspace"):FindFirstChild("Search_And_Rescue%") and game:GetService("Workspace")["Search_And_Rescue%"]:FindFirstChild("Helicopter_Spawn_Clickers") and game:GetService("Workspace")["Search_And_Rescue%"]["Helicopter_Spawn_Clickers"]:FindFirstChild("Basecamp")
         if basecampPart then
             updateStatus("INITIAL TP TO BASECAMP...")
             teleportTo(basecampPart)
