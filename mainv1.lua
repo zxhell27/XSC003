@@ -1,5 +1,6 @@
 -- MainScript.lua
--- Gabungan UI dan Logika dengan UI pop-up 'Z' merah RGB, dan fungsi Teleportasi
+-- Gabungan UI dan Logika dengan UI pop-up 'Z' merah RGB, dan fungsi Teleportasi.
+-- Alur utama difokuskan hanya pada urutan teleportasi dari dokumen yang diberikan.
 
 -- // UI FRAME (Struktur Asli Dipertahankan) //
 local ScreenGui = Instance.new("ScreenGui")
@@ -32,11 +33,11 @@ local timerInputElements = {}
 
 -- --- Variabel Kontrol dan State ---
 local scriptRunning = false
-local stopUpdateQi = false
-local pauseUpdateQiTemporarily = false
+local stopUpdateQi = false -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
+local pauseUpdateQiTemporarily = false -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
 local mainCycleThread = nil
-local aptitudeMineThread = nil
-local updateQiThread = nil
+local aptitudeMineThread = nil -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
+local updateQiThread = nil -- Mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk kompatibilitas UI
 
 local isMinimized = false
 local originalFrameSize = UDim2.new(0, 260, 0, 420) -- Ukuran awal UI lebih kecil
@@ -48,30 +49,30 @@ local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibu
 
 -- --- Tabel Konfigurasi Timer ---
 local timers = {
+    -- Timer yang relevan untuk alur teleportasi
+    wait_after_camp_teleport = 5 * 60, -- 5 menit (diambil dari dokumen alur)
+    genericShortDelay = 0.5, -- Jeda singkat setelah teleportasi checkpoint
+
+    -- Timer lain dari mainv2.lua yang mungkin tidak digunakan dalam alur teleportasi saja,
+    -- tetapi dipertahankan untuk konsistensi UI konfigurasi timer.
     wait_1m30s_after_first_items = 90,
     alur_wait_40s_hide_qi = 40,
     comprehend_duration = 20,
     post_comprehend_qi_duration = 60,
-
     user_script_wait1_before_items1 = 15,
     user_script_wait2_after_items1 = 10,
     user_script_wait3_before_items2 = 0.01,
     user_script_wait4_before_forbidden = 0.01,
-
     update_qi_interval = 1,
     aptitude_mine_interval = 0.1,
-    genericShortDelay = 0.5,
     reincarnateDelay = 0.5,
     buyItemDelay = 0.25,
     changeMapDelay = 0.5,
-    fireserver_generic_delay = 0.25,
-
-    -- Waktu tunggu spesifik untuk teleportasi
-    wait_after_camp_teleport = 5 * 60 -- 5 menit
+    fireserver_generic_delay = 0.25
 }
 
 -- --- Tabel Konfigurasi Teleportasi ---
--- Data ini diambil dari file "script Roblox via executor" Anda
+-- Data ini diambil langsung dari file "script Roblox via executor" Anda.
 local teleportLocations = {
     -- Camp 1
     ["Camp1"] = {
@@ -209,7 +210,7 @@ local yOffsetForTimers = yOffsetForTitle + 100 -- Disesuaikan
 -- --- Konfigurasi Timer UI ---
 TimerTitleLabel.Size = UDim2.new(1, -40, 0, 20) -- Lebih kecil
 TimerTitleLabel.Position = UDim2.new(0, 20, 0, yOffsetForTimers)
-TimerTitleLabel.Text = "// TIMER CONFIGURATION_SEQ"
+TimerTitleLabel.Text = "// KONFIGURASI_TIMER"
 TimerTitleLabel.Font = Enum.Font.Code
 TimerTitleLabel.TextSize = 14 -- Ukuran font sedang
 TimerTitleLabel.TextColor3 = Color3.fromRGB(255, 80, 80) -- Merah terang
@@ -238,7 +239,7 @@ local function createTimerInput(name, yPos, labelText, initialValue)
     input.Size = UDim2.new(0.45, -25, 0, 20) -- Lebih kecil
     input.Position = UDim2.new(0.55, 5, 0, yPos + yOffsetForTimers)
     input.Text = tostring(initialValue)
-    input.PlaceholderText = "sec"
+    input.PlaceholderText = "detik" -- Diubah ke Bahasa Indonesia
     input.Font = Enum.Font.SourceSansSemibold
     input.TextSize = 12 -- Ukuran font sedang
     input.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -258,18 +259,17 @@ end
 
 local currentYConfig = 30 -- Jarak dari TimerTitleLabel (disesuaikan)
 -- Inisialisasi nilai input timer dari tabel timers
-timerInputElements.wait1m30sInput = createTimerInput("Wait1m30s", currentYConfig, "T1_POST_ITEM_SET1", timers.wait_1m30s_after_first_items)
-currentYConfig = currentYConfig + 25 -- Jarak antar input (disesuaikan)
-timerInputElements.wait40sInput = createTimerInput("Wait40s", currentYConfig, "T2_ITEM2_QI_PAUSE", timers.alur_wait_40s_hide_qi)
+-- Hanya tampilkan timer yang relevan untuk teleportasi atau yang umum
+timerInputElements.waitAfterCampTeleportInput = createTimerInput("WaitAfterCampTeleport", currentYConfig, "Tunggu Setelah Camp", timers.wait_after_camp_teleport)
 currentYConfig = currentYConfig + 25
-timerInputElements.comprehendInput = createTimerInput("Comprehend", currentYConfig, "T3_COMPREHEND_DUR", timers.comprehend_duration)
-currentYConfig = currentYConfig + 25
-timerInputElements.postComprehendQiInput = createTimerInput("PostComprehendQi", currentYConfig, "T4_POST_COMP_QI_DUR", timers.post_comprehend_qi_duration)
+-- Anda bisa menambahkan lebih banyak input timer jika ada durasi spesifik lainnya yang ingin dikonfigurasi pengguna untuk alur teleportasi.
+-- Untuk saat ini, saya hanya menampilkan yang paling relevan.
+timerInputElements.genericShortDelayInput = createTimerInput("GenericShortDelay", currentYConfig, "Jeda Singkat", timers.genericShortDelay)
 currentYConfig = currentYConfig + 35 -- Disesuaikan
 
 ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30) -- Lebih kecil
 ApplyTimersButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers)
-ApplyTimersButton.Text = "APPLY_TIMERS"
+ApplyTimersButton.Text = "TERAPKAN_TIMER" -- Diubah ke Bahasa Indonesia
 ApplyTimersButton.Font = Enum.Font.SourceSansBold
 ApplyTimersButton.TextSize = 14 -- Ukuran font sedang
 ApplyTimersButton.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -315,11 +315,9 @@ minimizedZLabel.Visible = false -- Awalnya sembunyi
 -- Kumpulan elemen yang visibilitasnya akan di-toggle
 elementsToToggleVisibility = {
     UiTitleLabel, StartButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
-    timerInputElements.wait1m30sLabel, timerInputElements.wait1m30sInput,
-    timerInputElements.wait40sLabel, timerInputElements.wait40sInput,
-    timerInputElements.comprehendLabel, timerInputElements.comprehendInput,
-    timerInputElements.postComprehendQiLabel, timerInputElements.postComprehendQiInput,
-    MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
+    timerInputElements.waitAfterCampTeleportInput, timerInputElements.waitAfterCampTeleportLabel,
+    timerInputElements.genericShortDelayInput, timerInputElements.genericShortDelayLabel,
+    MinimizeButton -- Sertakan MinimizeButton di sini untuk menyembunyikannya dalam mode 'Z'
 }
 
 -- // Fungsi Bantu UI //
@@ -344,10 +342,7 @@ end
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
-        -- Simpan posisi original Frame sebelum diubah
-        local originalFramePosition = Frame.Position
-
-        -- Sembunyikan semua elemen kecuali Frame dan 'Z' label
+        -- Sembunyikan semua elemen kecuali Frame dan label 'Z'
         for _, element in ipairs(elementsToToggleVisibility) do
             if element and element.Parent then element.Visible = false end
         end
@@ -392,7 +387,7 @@ local function waitSeconds(sec)
     until not scriptRunning or tick() - startTime >= sec
 end
 
--- Fungsi fireRemoteEnhanced
+-- Fungsi fireRemoteEnhanced (dipertahankan untuk kompatibilitas, meskipun mungkin tidak digunakan dalam alur teleportasi saja)
 local function fireRemoteEnhanced(remoteName, pathType, ...)
     local argsToUnpack = table.pack(...)
     local remoteEventFolder
@@ -423,8 +418,8 @@ local localPlayer = Players.LocalPlayer
 
 local function teleportToCFrame(targetCFrame, locationName)
     if not localPlayer or not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        updateStatus("Teleport_Fail: No_Character")
-        warn("Teleport failed: LocalPlayer character or HumanoidRootPart not found.")
+        updateStatus("Teleport_Gagal: Karakter_Tidak_Ditemukan") -- Diubah ke Bahasa Indonesia
+        warn("Teleport gagal: Karakter LocalPlayer atau HumanoidRootPart tidak ditemukan.") -- Diubah ke Bahasa Indonesia
         return false
     end
 
@@ -434,174 +429,91 @@ local function teleportToCFrame(targetCFrame, locationName)
     end)
 
     if success then
-        updateStatus("Teleporting: " .. (locationName or "Unknown Location"))
+        updateStatus("Teleporting: " .. (locationName or "Lokasi_Tidak_Dikenal")) -- Diubah ke Bahasa Indonesia
         return true
     else
-        updateStatus("Teleport_Fail: " .. (locationName or "Unknown Location"))
-        warn("Error teleporting to " .. (locationName or "Unknown Location") .. ": " .. tostring(success))
+        updateStatus("Teleport_Gagal: " .. (locationName or "Lokasi_Tidak_Dikenal")) -- Diubah ke Bahasa Indonesia
+        warn("Error teleportasi ke " .. (locationName or "Lokasi_Tidak_Dikenal") .. ": " .. tostring(pcallResult)) -- Diubah ke Bahasa Indonesia
         return false
     end
 end
 
--- // Fungsi utama //
+-- // Fungsi utama alur (Hanya Teleportasi) //
 local function runCycle()
-    updateStatus("Reincarnating_Proc")
-    if not fireRemoteEnhanced("Reincarnate", "Base", {}) then scriptRunning = false; return end
-    task.wait(timers.reincarnateDelay)
-    if not scriptRunning then return end
-    updateStatus("Item_Set1_Prep")
-    waitSeconds(timers.user_script_wait1_before_items1)
-    if not scriptRunning then return end
-    local item1 = {"Nine Heavens Galaxy Water", "Buzhou Divine Flower", "Fusang Divine Tree", "Calm Cultivation Mat"}
-    for _, item in ipairs(item1) do
-        if not scriptRunning then return end
-        updateStatus("Buying: " .. item:sub(1,15).."...")
-        if not fireRemoteEnhanced("BuyItem", "Base", item) then scriptRunning = false; return end
-        task.wait(timers.buyItemDelay)
-    end
-    if not scriptRunning then return end
-    updateStatus("Map_Change_Prep")
-    waitSeconds(timers.wait_1m30s_after_first_items)
-    if not scriptRunning then return end
-    local function changeMap(name) return fireRemoteEnhanced("ChangeMap", "AreaEvents", name) end
-    if not changeMap("immortal") then scriptRunning = false; return end
-    task.wait(timers.changeMapDelay); updateStatus("Map: Immortal")
-    if not scriptRunning then return end
-    if not changeMap("chaos") then scriptRunning = false; return end
-    task.wait(timers.changeMapDelay); updateStatus("Map: Chaos")
-    if not scriptRunning then return end
-    updateStatus("Chaotic_Road_Proc")
-    if not fireRemoteEnhanced("ChaoticRoad", "AreaEvents", {}) then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay)
-    if not scriptRunning then return end
-    updateStatus("Item_Set2_Prep")
-    pauseUpdateQiTemporarily = true
-    updateStatus("QI_Update_Paused (" .. timers.alur_wait_40s_hide_qi .. "s)")
-    waitSeconds(timers.alur_wait_40s_hide_qi)
-    pauseUpdateQiTemporarily = false
-    updateStatus("QI_Update_Resumed")
-    if not scriptRunning then return end
-    local item2 = {"Traceless Breeze Lotus", "Reincarnation World Destruction Black Lotus", "Ten Thousand Bodhi Tree"}
-    for _, item in ipairs(item2) do
-        if not scriptRunning then return end
-        updateStatus("Buying: " .. item:sub(1,15).."...")
-        if not fireRemoteEnhanced("BuyItem", "Base", item) then scriptRunning = false; return end
-        task.wait(timers.buyItemDelay)
-    end
-    if not scriptRunning then return end
-    if not changeMap("immortal") then scriptRunning = false; return end
-    task.wait(timers.changeMapDelay); updateStatus("Map: Immortal (Return)")
-    if not scriptRunning then return end
-    if scriptRunning and not stopUpdateQi and not pauseUpdateQiTemporarily then
-        updateStatus("HiddenRemote_Proc (QI_Active)")
-        if not fireRemoteEnhanced("HiddenRemote", "AreaEvents", {}) then scriptRunning = false; return end
-    else updateStatus("HiddenRemote_Skip (QI_Inactive)") end
-    task.wait(timers.genericShortDelay)
+    updateStatus("Memulai_Alur_Teleportasi") -- Diubah ke Bahasa Indonesia
 
-    -- --- LOGIKA TELEPORTASI DIMULAI DI SINI ---
     -- Teleport ke Camp 1
-    updateStatus("Teleporting to Camp 1")
+    updateStatus("Teleportasi_ke_Camp_1")
     if not teleportToCFrame(teleportLocations.Camp1.cframe, "Camp 1") then scriptRunning = false; return end
     waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
     if not scriptRunning then return end
 
     -- Teleport ke Checkpoint Camp 1
-    updateStatus("Teleporting to Checkpoint Camp 1")
+    updateStatus("Teleportasi_ke_Checkpoint_Camp_1")
     if not teleportToCFrame(teleportLocations.CheckpointCamp1.cframe, "Checkpoint Camp 1") then scriptRunning = false; return end
     task.wait(timers.genericShortDelay) -- Jeda singkat setelah teleport
     if not scriptRunning then return end
 
     -- Teleport ke Camp 2
-    updateStatus("Teleporting to Camp 2")
+    updateStatus("Teleportasi_ke_Camp_2")
     if not teleportToCFrame(teleportLocations.Camp2.cframe, "Camp 2") then scriptRunning = false; return end
     waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
     if not scriptRunning then return end
 
     -- Teleport ke Checkpoint Camp 2
-    updateStatus("Teleporting to Checkpoint Camp 2")
+    updateStatus("Teleportasi_ke_Checkpoint_Camp_2")
     if not teleportToCFrame(teleportLocations.CheckpointCamp2.cframe, "Checkpoint Camp 2") then scriptRunning = false; return end
     task.wait(timers.genericShortDelay)
     if not scriptRunning then return end
 
     -- Teleport ke Camp 3
-    updateStatus("Teleporting to Camp 3")
+    updateStatus("Teleportasi_ke_Camp_3")
     if not teleportToCFrame(teleportLocations.Camp3.cframe, "Camp 3") then scriptRunning = false; return end
     waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
     if not scriptRunning then return end
 
     -- Teleport ke Checkpoint Camp 3
-    updateStatus("Teleporting to Checkpoint Camp 3")
+    updateStatus("Teleportasi_ke_Checkpoint_Camp_3")
     if not teleportToCFrame(teleportLocations.CheckpointCamp3.cframe, "Checkpoint Camp 3") then scriptRunning = false; return end
     task.wait(timers.genericShortDelay)
     if not scriptRunning then return end
 
     -- Teleport ke Camp 4
-    updateStatus("Teleporting to Camp 4")
+    updateStatus("Teleportasi_ke_Camp_4")
     if not teleportToCFrame(teleportLocations.Camp4.cframe, "Camp 4") then scriptRunning = false; return end
     waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
     if not scriptRunning then return end
 
     -- Teleport ke Checkpoint Camp 4
-    updateStatus("Teleporting to Checkpoint Camp 4")
+    updateStatus("Teleportasi_ke_Checkpoint_Camp_4")
     if not teleportToCFrame(teleportLocations.CheckpointCamp4.cframe, "Checkpoint Camp 4") then scriptRunning = false; return end
     task.wait(timers.genericShortDelay)
     if not scriptRunning then return end
 
     -- Teleport ke Checkpoint South Pole
-    updateStatus("Teleporting to Checkpoint South Pole")
+    updateStatus("Teleportasi_ke_Checkpoint_South_Pole")
     waitSeconds(timers.wait_after_camp_teleport) -- Tunggu 5 menit
     if not scriptRunning then return end
     if not teleportToCFrame(teleportLocations.CheckpointSouthPole.cframe, "Checkpoint South Pole") then scriptRunning = false; return end
     task.wait(timers.genericShortDelay)
     if not scriptRunning then return end
-    -- --- LOGIKA TELEPORTASI BERAKHIR DI SINI ---
 
-    updateStatus("Forbidden_Zone_Prep (Direct)")
-    if not scriptRunning then return end
-    updateStatus("Forbidden_Zone_Enter")
-    if not fireRemoteEnhanced("ForbiddenZone", "AreaEvents", {}) then scriptRunning = false; return end
-    task.wait(timers.genericShortDelay)
-    if not scriptRunning then return end
-    updateStatus("Comprehend_Proc (" .. timers.comprehend_duration .. "s)")
-    stopUpdateQi = true
-    local comprehendStartTime = tick()
-    while scriptRunning and (tick() - comprehendStartTime < timers.comprehend_duration) do
-        if not fireRemoteEnhanced("Comprehend", "Base", {}) then updateStatus("Comprehend_Event_Fail"); break end
-        updateStatus(string.format("Comprehending... %ds Left", math.floor(timers.comprehend_duration - (tick() - comprehendStartTime))))
-        task.wait(1)
-    end
-    if not scriptRunning then return end; updateStatus("Comprehend_Complete")
-    if scriptRunning then
-        updateStatus("Post_Comprehend_Hidden_Proc")
-        if not fireRemoteEnhanced("HiddenRemote", "AreaEvents", {}) then updateStatus("Post_Comp_Hidden_Fail") end
-        task.wait(timers.genericShortDelay)
-    end
-    if not scriptRunning then return end
-    updateStatus("Final_QI_Update (" .. timers.post_comprehend_qi_duration .. "s)")
-    stopUpdateQi = false
-    local postComprehendQiStartTime = tick()
-    while scriptRunning and (tick() - postComprehendQiStartTime < timers.post_comprehend_qi_duration) do
-        if stopUpdateQi then updateStatus("Post_Comp_QI_Halt"); break end
-        updateStatus(string.format("Post_Comp_QI_Active... %ds Left", math.floor(timers.post_comprehend_qi_duration - (tick() - postComprehendQiStartTime))))
-        task.wait(1)
-    end
-    if not scriptRunning then return end; stopUpdateQi = true
-    updateStatus("Cycle_Complete_Restarting")
+    updateStatus("Siklus_Teleportasi_Selesai_Mengulang") -- Diubah ke Bahasa Indonesia
 end
 
--- Loop Latar Belakang
+-- Loop Latar Belakang (Dipertahankan untuk kompatibilitas, tapi tidak akan melakukan apa-apa jika hanya alur teleportasi)
 local function increaseAptitudeMineLoop_enhanced()
     while scriptRunning do
-        fireRemoteEnhanced("IncreaseAptitude", "Base", {})
+        -- fireRemoteEnhanced("IncreaseAptitude", "Base", {}) -- Dikomentari karena bukan bagian dari alur teleportasi
         task.wait(timers.aptitude_mine_interval)
-        if not scriptRunning then break end
-        fireRemoteEnhanced("Mine", "Base", {})
+        -- if not scriptRunning then break end
+        -- fireRemoteEnhanced("Mine", "Base", {}) -- Dikomentari karena bukan bagian dari alur teleportasi
         task.wait()
     end
 end
 local function updateQiLoop_enhanced()
     while scriptRunning do
-        if not stopUpdateQi and not pauseUpdateQiTemporarily then fireRemoteEnhanced("UpdateQi", "Base", {}) end
+        -- if not stopUpdateQi and not pauseUpdateQiTemporarily then fireRemoteEnhanced("UpdateQi", "Base", {}) end -- Dikomentari
         task.wait(timers.update_qi_interval)
     end
 end
@@ -610,11 +522,12 @@ end
 StartButton.MouseButton1Click:Connect(function()
     scriptRunning = not scriptRunning
     if scriptRunning then
-        StartButton.Text = "SYSTEM_ACTIVE"
+        StartButton.Text = "SISTEM_AKTIF" -- Diubah ke Bahasa Indonesia
         StartButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30) -- Merah menyala
         StartButton.TextColor3 = Color3.fromRGB(255,255,255)
-        updateStatus("INIT_SEQUENCE")
+        updateStatus("MEMULAI_URUTAN") -- Diubah ke Bahasa Indonesia
         stopUpdateQi = false; pauseUpdateQiTemporarily = false
+        -- Loop latar belakang mungkin tidak relevan jika hanya teleportasi, tapi dipertahankan untuk struktur.
         if not aptitudeMineThread or coroutine.status(aptitudeMineThread) == "dead" then aptitudeMineThread = task.spawn(increaseAptitudeMineLoop_enhanced) end
         if not updateQiThread or coroutine.status(updateQiThread) == "dead" then updateQiThread = task.spawn(updateQiLoop_enhanced) end
         if not mainCycleThread or coroutine.status(mainCycleThread) == "dead" then
@@ -622,17 +535,17 @@ StartButton.MouseButton1Click:Connect(function()
                 while scriptRunning do
                     runCycle()
                     if not scriptRunning then break end
-                    updateStatus("CYCLE_REINIT")
+                    updateStatus("SIKLUS_MENGULANG") -- Diubah ke Bahasa Indonesia
                     task.wait(1)
                 end
-                updateStatus("SYSTEM_HALTED")
-                StartButton.Text = "START SEQUENCE"
+                updateStatus("SISTEM_BERHENTI") -- Diubah ke Bahasa Indonesia
+                StartButton.Text = "MULAI_URUTAN" -- Diubah ke Bahasa Indonesia
                 StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
                 StartButton.TextColor3 = Color3.fromRGB(220,220,220)
             end)
         end
     else
-        updateStatus("HALT_REQUESTED")
+        updateStatus("PERMINTAAN_BERHENTI") -- Diubah ke Bahasa Indonesia
     end
 end)
 
@@ -648,17 +561,16 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
         return success
     end
     local allTimersValid = true
-    allTimersValid = applyTextInput(timerInputElements.wait1m30sInput, "wait_1m30s_after_first_items", timerInputElements.Wait1m30sLabel) and allTimersValid
-    allTimersValid = applyTextInput(timerInputElements.wait40sInput, "alur_wait_40s_hide_qi", timerInputElements.Wait40sLabel) and allTimersValid
-    allTimersValid = applyTextInput(timerInputElements.comprehendInput, "comprehend_duration", timerInputElements.ComprehendLabel) and allTimersValid
-    allTimersValid = applyTextInput(timerInputElements.postComprehendQiInput, "post_comprehend_qi_duration", timerInputElements.PostComprehendQiLabel) and allTimersValid
+    -- Hanya terapkan timer yang relevan untuk alur teleportasi
+    allTimersValid = applyTextInput(timerInputElements.waitAfterCampTeleportInput, "wait_after_camp_teleport", timerInputElements.waitAfterCampTeleportLabel) and allTimersValid
+    allTimersValid = applyTextInput(timerInputElements.genericShortDelayInput, "genericShortDelay", timerInputElements.genericShortDelayLabel) and allTimersValid
+
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
-    if allTimersValid then updateStatus("TIMER_CONFIG_APPLIED") else updateStatus("ERR_TIMER_INPUT_INVALID") end
+    if allTimersValid then updateStatus("KONFIGURASI_TIMER_DITERAPKAN") else updateStatus("ERR_INPUT_TIMER_TIDAK_VALID") end -- Diubah ke Bahasa Indonesia
     task.wait(2)
-    if timerInputElements.Wait1m30sLabel then pcall(function() timerInputElements.Wait1m30sLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
-    if timerInputElements.Wait40sLabel then pcall(function() timerInputElements.Wait40sLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
-    if timerInputElements.ComprehendLabel then pcall(function() timerInputElements.ComprehendLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
-    if timerInputElements.PostComprehendQiLabel then pcall(function() timerInputElements.PostComprehendQiLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    -- Reset warna label
+    if timerInputElements.waitAfterCampTeleportLabel then pcall(function() timerInputElements.waitAfterCampTeleportLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    if timerInputElements.genericShortDelayLabel then pcall(function() timerInputElements.genericShortDelayLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     updateStatus(originalStatus)
 end)
 
@@ -798,6 +710,6 @@ game:BindToClose(function()
 end)
 
 -- Inisialisasi
-print("Skrip Otomatisasi (Versi UI Canggih dengan Teleportasi) Telah Dimuat.")
+print("Skrip Otomatisasi (Teleportasi Saja) Telah Dimuat.") -- Pesan inisialisasi yang diperbarui
 task.wait(1)
-if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
+if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: SIAGA" end -- Diubah ke Bahasa Indonesia
