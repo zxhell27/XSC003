@@ -1,69 +1,58 @@
--- Dijalankan melalui LocalScript (misal di StarterPlayerScripts)
-
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-
--- Fungsi untuk teleport menggunakan CFrame
+-- // === FUNGSI TELEPORT === //
 local function teleportTo(part)
-    local character = player.Character or player.CharacterAdded:Wait()
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-    
-    if part and rootPart then
-        rootPart.CFrame = part.CFrame + Vector3.new(0, 3, 0) -- +3 agar tidak terjebak dalam tanah
-    end
-end
-
--- Daftar lokasi sesuai dokumen
-local lokasi = {
-    workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp,
-    workspace["Camp_Main_Tents%"].Camp1,
-    workspace:GetChildren()[264],
-    workspace["Camp_Main_Tents%"].Camp2,
-    workspace:GetChildren()[731],
-    workspace["Camp_Main_Tents%"].Camp3,
-    workspace:GetChildren()[550],
-    workspace["Camp_Main_Tents%"].Camp4,
-    workspace["Checkpoint *camp 4*"],
-    workspace["Checkpoints%"]["South Pole"].SpawnLocation
-}
-
--- Fungsi minum air (per 7 menit)
-local function minumAir()
+    local player = game:GetService("Players").LocalPlayer
     local char = player.Character or player.CharacterAdded:Wait()
-    local bottle = char:FindFirstChild("Water Bottle")
-    if bottle and bottle:FindFirstChild("RemoteEvent") then
-        bottle.RemoteEvent:FireServer()
+    local root = char:WaitForChild("HumanoidRootPart", 5)
+
+    if not part then
+        updateStatus("ERR_NO_DEST_PART")
+        warn("Teleport error: part tujuan tidak ditemukan.")
+        return false
     end
+
+    if not root then
+        updateStatus("ERR_NO_HRP")
+        warn("Teleport error: HumanoidRootPart tidak ditemukan.")
+        return false
+    end
+
+    pcall(function()
+        root.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+    end)
+
+    updateStatus("TELEPORT_OK")
+    return true
 end
 
--- Eksekusi utama
-coroutine.wrap(function()
-    wait(5)
-    teleportTo(lokasi[1])
+-- // === TOMBOL TEST TELEPORT === //
+local teleportButton = Instance.new("TextButton")
+teleportButton.Name = "TeleportButton"
+teleportButton.Parent = Frame
+teleportButton.Size = UDim2.new(1, -40, 0, 30)
+teleportButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers + 50)
+teleportButton.Text = "TELEPORT TEST"
+teleportButton.Font = Enum.Font.SourceSansBold
+teleportButton.TextSize = 14
+teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportButton.BackgroundColor3 = Color3.fromRGB(80, 80, 20)
+teleportButton.BorderColor3 = Color3.fromRGB(255, 255, 80)
+teleportButton.ZIndex = 2
 
-    while true do
-        wait(5)
-        teleportTo(lokasi[2])
-        wait(300)
-        teleportTo(lokasi[3])
-        wait(5)
-        teleportTo(lokasi[4])
-        wait(300)
-        teleportTo(lokasi[5])
-        wait(5)
-        teleportTo(lokasi[6])
-        wait(300)
-        teleportTo(lokasi[7])
-        wait(5)
-        teleportTo(lokasi[8])
-        wait(300)
-        teleportTo(lokasi[9])
-        wait(300)
-        teleportTo(lokasi[10])
+local teleportCorner = Instance.new("UICorner")
+teleportCorner.CornerRadius = UDim.new(0, 5)
+teleportCorner.Parent = teleportButton
 
-        wait(420) -- 7 menit
-        minumAir()
+table.insert(elementsToToggleVisibility, teleportButton)
 
-        -- ulangi dari Camp1 (lokasi[2])
+-- === OBJEK TUJUAN UNTUK TELEPORT TEST === --
+-- Ganti sesuai target di dokumen ekspedisi
+local testTeleportTarget = workspace:FindFirstChild("Camp_Main_Tents%") and workspace["Camp_Main_Tents%"]:FindFirstChild("Camp1")
+
+-- === AKSI SAAT DITEKAN === --
+teleportButton.MouseButton1Click:Connect(function()
+    if teleportTo(testTeleportTarget) then
+        updateStatus("TELEPORT_OK")
+    else
+        updateStatus("TELEPORT_FAIL")
     end
-end)()
+end)
