@@ -1,7 +1,3 @@
--- Main Teleport Script for Roblox Antarctic Expedition
--- Designed for Arcues Executor
--- Features: Auto Teleport, Manual Teleport, Auto Teleport Time Settings, Status Log, Timer
--- Inspired by mainv2.lua UI design
 
 -- // Services //
 local Players = game:GetService("Players")
@@ -717,7 +713,7 @@ local function populateDropdownOptions()
     end
     -- Adjust the height of the dropdown options frame based on content
     TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0, 0, 0, #orderedLocations * (optionHeight + UIListLayout.Padding.Offset))
-    TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, math.min(150, TeleportDropdownOptionsFrame.CanvasSize.Y.Offset))
+    TeleportDropdownOptionsFrame.Size = UDim2.new(1, 0, 0, math.min(150, TeleportDropdownOptionsFrame.CanvasSize.Y.Offset)) -- Adjusted width to fill parent
 end
 
 TeleportLocationSelector.MouseButton1Click:Connect(function()
@@ -795,7 +791,8 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
     local borderBase = Color3.fromRGB(255,0,0)
     local borderGlitch = Color3.fromRGB(0,255,255)
     local borderThicknessBase = 2
-    local glitchCharsBorder = {"Z", "X", "H", "E", "L", "L", "1", "0", "!", "@", "#", "$"} -- Karakter untuk border glitch
+    -- Characters for border glitch (will be simulated visually, not actual text on border)
+    local glitchCharsBorder = {"Z", "X", "H", "E", "L", "L", "1", "0", "!", "@", "#", "$"} 
 
     while ScreenGui and ScreenGui.Parent do
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
@@ -804,35 +801,26 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
                 Frame.BackgroundColor3 = glitchColor1
                 Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255)) -- Warna acak
                 Frame.BorderSizePixel = math.random(3, 7) -- Ketebalan acak
-                -- Mengganti border dengan huruf Z yang berglitch
-                local glitchText = ""
-                for i = 1, math.floor(Frame.AbsoluteSize.X / 10) do -- Sesuaikan kerapatan huruf Z
-                    glitchText = glitchText .. glitchCharsBorder[math.random(#glitchCharsBorder)]
-                end
-                Frame.Text = glitchText -- Menggunakan properti Text pada Frame (jika ada, atau simulasi)
-                Frame.BackgroundTransparency = 0.8 -- Make background slightly visible for text
-                Frame.LayoutOrder = math.random(-1,1) -- Random slight movement
-
+                -- Simulate glitching effect on the frame itself
+                Frame.BackgroundTransparency = math.random() * 0.4 -- Make background slightly transparent
+                Frame.Position = Frame.Position + UDim2.fromOffset(math.random(-1,1), math.random(-1,1)) -- Slight random movement
                 task.wait(0.05)
                 Frame.BackgroundColor3 = glitchColor2
                 Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
                 Frame.BorderSizePixel = math.random(1, 5)
-                Frame.Text = "" -- Clear text after glitch
                 Frame.BackgroundTransparency = 0 -- Reset transparency
-                Frame.LayoutOrder = 0
+                Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Reset position
                 task.wait(0.05)
             elseif r < 0.4 then -- Glitch ringan (lebih sering)
                 Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random())
                 Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.8)
                 Frame.BorderSizePixel = math.random(2, 4)
-                Frame.Text = "" -- Ensure no text during light glitch
                 Frame.BackgroundTransparency = 0
                 task.wait(0.1)
             else
                 Frame.BackgroundColor3 = baseColor
                 Frame.BorderColor3 = borderBase
                 Frame.BorderSizePixel = borderThicknessBase
-                Frame.Text = "" -- Ensure no text when normal
                 Frame.BackgroundTransparency = 0
             end
             -- Animasi border utama (HSV shift) yang lebih halus saat tidak glitch intens
@@ -842,8 +830,8 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
             Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
             Frame.BorderSizePixel = borderThicknessBase
-            Frame.Text = ""
             Frame.BackgroundTransparency = 0
+            Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Ensure position is reset
         end
         task.wait(0.05)
     end
