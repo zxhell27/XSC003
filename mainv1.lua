@@ -40,10 +40,10 @@ ManualTeleportFrame.Name = "ManualTeleportFrame"
 local ManualTeleportTitle = Instance.new("TextLabel")
 ManualTeleportTitle.Name = "ManualTeleportTitle"
 
-local TeleportLocationSelector = Instance.new("TextButton") -- Changed from TextBox to TextButton for dropdown trigger
+local TeleportLocationSelector = Instance.new("TextButton")
 TeleportLocationSelector.Name = "TeleportLocationSelector"
 
-local TeleportDropdownOptionsFrame = Instance.new("ScrollingFrame") -- Frame for dropdown options
+local TeleportDropdownOptionsFrame = Instance.new("ScrollingFrame")
 TeleportDropdownOptionsFrame.Name = "TeleportDropdownOptionsFrame"
 
 local TeleportButton = Instance.new("TextButton")
@@ -62,16 +62,16 @@ LogOutput.Name = "LogOutput"
 local timerInputElements = {}
 
 -- --- Variabel Kontrol dan State ---
-local scriptRunning = true -- Diubah ke true agar script aktif by default
+local scriptRunning = true
 local autoTeleportActive = false
 local autoTeleportThread = nil
 local isMinimized = false
-local originalFrameSize = UDim2.new(0, 300, 0, 550) -- Ukuran UI disesuaikan
-local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
-local minimizedZLabel = Instance.new("TextLabel") -- Label khusus untuk pop-up 'Z'
+local originalFrameSize = UDim2.new(0, 300, 0, 550)
+local minimizedFrameSize = UDim2.new(0, 50, 0, 50)
+local minimizedElement -- Diubah dari minimizedZLabel, sekarang bisa berupa TextButton
 
 -- Kumpulan elemen yang visibilitasnya akan di-toggle
-local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibuat
+local elementsToToggleVisibility = {}
 
 -- Variabel untuk menyimpan posisi Y asli dari LogFrame
 local originalLogFramePositionYScale
@@ -79,13 +79,13 @@ local originalLogFramePositionYOffset
 
 -- --- Tabel Konfigurasi Timer ---
 local timers = {
-    teleport_wait_time = 300, -- Default 5 menit (300 detik)
-    teleport_delay_between_points = 5, -- Delay antar teleportasi dalam rute auto
-    log_clear_interval = 60, -- Interval untuk membersihkan log (detik)
-    teleport_y_offset = 5, -- Offset Y untuk mencegah clipping saat teleportasi
-    water_refill_duration = 5, -- Durasi pengisian air dalam detik
-    water_drink_interval = 300, -- Interval minum air dalam detik (5 menit)
-    water_drink_count = 5, -- Berapa kali player harus minum setiap interval
+    teleport_wait_time = 300,
+    teleport_delay_between_points = 5,
+    log_clear_interval = 60,
+    teleport_y_offset = 5,
+    water_refill_duration = 5,
+    water_drink_interval = 300,
+    water_drink_count = 5,
 }
 
 -- --- Definisi Titik Teleportasi (Ekspedisi Antartika) ---
@@ -125,40 +125,37 @@ local function setupCoreGuiParenting()
     if not Frame.Parent or Frame.Parent ~= ScreenGui then
         Frame.Parent = ScreenGui
     end
-    -- Pastikan semua elemen UI diparenting di sini
     UiTitleLabel.Parent = Frame
     StartAutoTeleportButton.Parent = Frame
     StatusLabel.Parent = Frame
     MinimizeButton.Parent = Frame
     TimerTitleLabel.Parent = Frame
     ApplyTimersButton.Parent = Frame
-    minimizedZLabel.Parent = Frame -- Parentkan label Z ke Frame
+    -- minimizedElement akan diparenting nanti saat dibuat
     ManualTeleportFrame.Parent = Frame
     ManualTeleportTitle.Parent = ManualTeleportFrame
     TeleportLocationSelector.Parent = ManualTeleportFrame
-    TeleportDropdownOptionsFrame.Parent = Frame -- Explicitly parent to Frame for dropdown visibility
+    TeleportDropdownOptionsFrame.Parent = Frame
     TeleportButton.Parent = ManualTeleportFrame
     LogFrame.Parent = Frame
     LogTitle.Parent = LogFrame
     LogOutput.Parent = LogFrame
 end
-
--- Panggil setupCoreGuiParenting di awal
 setupCoreGuiParenting()
 
 -- // Desain UI //
 
 -- --- Frame Utama ---
 Frame.Size = originalFrameSize
-Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2) -- Tengah layar
-Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20) -- Latar belakang gelap kebiruan
+Frame.Position = UDim2.new(0.5, -Frame.Size.X.Offset/2, 0.5, -Frame.Size.Y.Offset/2)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 Frame.Active = true
 Frame.Draggable = true
 Frame.BorderSizePixel = 2
-Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Awalnya merah, akan dianimasikan
-Frame.ClipsDescendants = false -- Changed to false to allow dropdown to extend outside
+Frame.BorderColor3 = Color3.fromRGB(255, 0, 0)
+Frame.ClipsDescendants = false
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10) -- Sudut lebih membulat
+UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = Frame
 
 -- --- Nama UI Label ("ANTARCTIC TELEPORT") ---
@@ -287,7 +284,7 @@ ApplyButtonCorner.Parent = ApplyTimersButton
 local yOffsetForManualTeleport = currentYConfig + yOffsetForTimers + 40
 
 -- --- Manual Teleport Section ---
-ManualTeleportFrame.Size = UDim2.new(1, -40, 0, 120) -- Tinggi awal, mungkin perlu disesuaikan jika dropdown sangat besar
+ManualTeleportFrame.Size = UDim2.new(1, -40, 0, 120)
 ManualTeleportFrame.Position = UDim2.new(0, 20, 0, yOffsetForManualTeleport)
 ManualTeleportFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 ManualTeleportFrame.BorderSizePixel = 1
@@ -317,22 +314,22 @@ TeleportLocationSelector.TextColor3 = Color3.fromRGB(255, 255, 255)
 TeleportLocationSelector.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 TeleportLocationSelector.BorderSizePixel = 1
 TeleportLocationSelector.BorderColor3 = Color3.fromRGB(100, 100, 120)
-TeleportLocationSelector.ZIndex = 3 -- Naikkan ZIndex agar di atas elemen lain di ManualTeleportFrame
+TeleportLocationSelector.ZIndex = 3
 TeleportLocationSelector.TextXAlignment = Enum.TextXAlignment.Left
 TeleportLocationSelector.TextWrapped = true
 local SelectorCorner = Instance.new("UICorner")
 SelectorCorner.CornerRadius = UDim.new(0, 3)
 SelectorCorner.Parent = TeleportLocationSelector
 
-TeleportDropdownOptionsFrame.Size = UDim2.new(0, TeleportLocationSelector.Size.X.Offset, 0, 150) -- Lebar mengikuti selector, tinggi maks 150
+TeleportDropdownOptionsFrame.Size = UDim2.new(0, TeleportLocationSelector.Size.X.Offset, 0, 150)
 TeleportDropdownOptionsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 TeleportDropdownOptionsFrame.BorderSizePixel = 1
 TeleportDropdownOptionsFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
-TeleportDropdownOptionsFrame.ZIndex = 10 -- ZIndex sangat tinggi agar di atas segalanya
+TeleportDropdownOptionsFrame.ZIndex = 10
 TeleportDropdownOptionsFrame.Visible = false
 TeleportDropdownOptionsFrame.ScrollBarThickness = 6
 TeleportDropdownOptionsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0,0,0,0) -- Biarkan AutomaticCanvasSize yang mengatur Y
+TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0,0,0,0)
 TeleportDropdownOptionsFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 local DropdownOptionsCorner = Instance.new("UICorner")
 DropdownOptionsCorner.CornerRadius = UDim.new(0, 3)
@@ -343,7 +340,7 @@ UIListLayout.FillDirection = Enum.FillDirection.Vertical
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 UIListLayout.Padding = UDim.new(0, 2)
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Penting untuk UIListLayout
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 TeleportButton.Size = UDim2.new(1, -20, 0, 30)
 TeleportButton.Position = UDim2.new(0, 10, 0, 80)
@@ -371,11 +368,8 @@ LogFrame.ZIndex = 2
 local LogFrameCorner = Instance.new("UICorner")
 LogFrameCorner.CornerRadius = UDim.new(0, 5)
 LogFrameCorner.Parent = LogFrame
-
--- Simpan posisi Y awal LogFrame
 originalLogFramePositionYScale = LogFrame.Position.Y.Scale
 originalLogFramePositionYOffset = LogFrame.Position.Y.Offset
-
 
 LogTitle.Size = UDim2.new(1, -20, 0, 20)
 LogTitle.Position = UDim2.new(0, 10, 0, 10)
@@ -418,19 +412,26 @@ local MinimizeButtonCorner = Instance.new("UICorner")
 MinimizeButtonCorner.CornerRadius = UDim.new(0, 3)
 MinimizeButtonCorner.Parent = MinimizeButton
 
--- --- Pop-up 'Z' (Baru) ---
-minimizedZLabel.Size = UDim2.new(1, 0, 1, 0)
-minimizedZLabel.Position = UDim2.new(0,0,0,0)
-minimizedZLabel.Text = "Z"
-minimizedZLabel.Font = Enum.Font.SourceSansBold
-minimizedZLabel.TextScaled = false
-minimizedZLabel.TextSize = 40
-minimizedZLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-minimizedZLabel.TextXAlignment = Enum.TextXAlignment.Center
-minimizedZLabel.TextYAlignment = Enum.TextYAlignment.Center
-minimizedZLabel.BackgroundTransparency = 1
-minimizedZLabel.ZIndex = 4
-minimizedZLabel.Visible = false
+-- --- Pop-up 'Z' (Diubah menjadi TextButton) ---
+minimizedElement = Instance.new("TextButton") -- Diubah dari TextLabel
+minimizedElement.Name = "MinimizedElementButton"
+minimizedElement.Parent = Frame
+minimizedElement.Size = UDim2.new(1, 0, 1, 0)
+minimizedElement.Position = UDim2.new(0,0,0,0)
+minimizedElement.Text = "Z"
+minimizedElement.Font = Enum.Font.SourceSansBold
+minimizedElement.TextScaled = false
+minimizedElement.TextSize = 40
+minimizedElement.TextColor3 = Color3.fromRGB(255, 0, 0)
+minimizedElement.TextXAlignment = Enum.TextXAlignment.Center
+minimizedElement.TextYAlignment = Enum.TextYAlignment.Center
+minimizedElement.BackgroundColor3 = Color3.fromRGB(15,15,20) -- Warna latar belakang sama dengan frame
+minimizedElement.BackgroundTransparency = 0 -- Buat sedikit terlihat
+minimizedElement.BorderColor3 = Color3.fromRGB(255,0,0)
+minimizedElement.BorderSizePixel = 2
+minimizedElement.ZIndex = 4
+minimizedElement.Visible = false
+minimizedElement.AutoButtonColor = false -- Menonaktifkan perubahan warna otomatis tombol
 
 elementsToToggleVisibility = {
     UiTitleLabel, StartAutoTeleportButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
@@ -479,38 +480,45 @@ end
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
+        -- Sembunyikan elemen utama
         for _, element in ipairs(elementsToToggleVisibility) do
             if element and element.Parent then element.Visible = false end
         end
-        minimizedZLabel.Visible = true
+        minimizedElement.Visible = true -- Tampilkan tombol 'Z'
+        -- Atur posisi dan ukuran frame yang diminimize
         local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02
         local targetY = 1 - (minimizedFrameSize.Y.Offset / ScreenGui.AbsoluteSize.Y) - 0.02
         local targetPosition = UDim2.new(targetX, 0, targetY, 0)
         animateFrame(minimizedFrameSize, targetPosition)
         Frame.Draggable = false
+        MinimizeButton.Visible = false -- Pastikan tombol minimize asli juga tersembunyi
     else
-        for _, element in ipairs(elementsToToggleVisibility) do
-            if element == MinimizeButton and element.Parent then element.Visible = true end
-        end
-        minimizedZLabel.Visible = false
-        MinimizeButton.Text = "_"
+        minimizedElement.Visible = false -- Sembunyikan tombol 'Z'
+        MinimizeButton.Text = "_" -- Kembalikan teks tombol minimize
+        -- Atur posisi dan ukuran frame yang dimaksimalkan
         local targetPosition = UDim2.new(0.5, -originalFrameSize.X.Offset/2, 0.5, -originalFrameSize.Y.Offset/2)
         animateFrame(originalFrameSize, targetPosition, function()
+            -- Tampilkan kembali elemen utama setelah animasi selesai
             for _, element in ipairs(elementsToToggleVisibility) do
                 if element and element.Parent then element.Visible = true end
             end
             Frame.Draggable = true
+            MinimizeButton.Visible = true -- Pastikan tombol minimize asli terlihat
         end)
     end
 end
 MinimizeButton.MouseButton1Click:Connect(toggleMinimize)
+if minimizedElement:IsA("TextButton") then -- Hubungkan event klik jika itu TextButton
+    minimizedElement.MouseButton1Click:Connect(toggleMinimize)
+end
+
 
 -- // Fungsi tunggu //
 local function waitSeconds(sec)
     if sec <= 0 then task.wait() return end
     local startTime = tick()
     repeat
-        RunService.Heartbeat:Wait() -- Lebih baik menggunakan Heartbeat untuk loop tunggu yang responsif
+        RunService.Heartbeat:Wait()
     until not scriptRunning or tick() - startTime >= sec
 end
 
@@ -529,7 +537,7 @@ local function teleportPlayer(cframeTarget, locationName)
                     end
                 end
                 LocalPlayer.Character.HumanoidRootPart.CFrame = cframeTarget + Vector3.new(0, timers.teleport_y_offset, 0)
-                task.wait(0.1) -- Beri sedikit waktu untuk teleportasi
+                task.wait(0.1)
                 for part, canCollide in pairs(originalCanCollide) do
                     if part and part.Parent then part.CanCollide = canCollide end
                 end
@@ -641,7 +649,7 @@ local function autoTeleportCycle()
             waitSeconds(5)
         end
     end
-    if scriptRunning then -- Hanya update status jika script masih berjalan
+    if scriptRunning then
         updateStatus("AUTO_TELEPORT_STOPPED")
         appendLog("Auto-teleport sequence halted.")
     end
@@ -666,7 +674,6 @@ StartAutoTeleportButton.MouseButton1Click:Connect(function()
         StartAutoTeleportButton.TextColor3 = Color3.fromRGB(220,220,220)
         updateStatus("HALT_REQUESTED")
         appendLog("Auto teleport sequence halt requested.")
-        -- Tidak perlu menghentikan thread secara eksplisit di sini, loop akan berhenti sendiri
     end
 end)
 
@@ -705,9 +712,8 @@ end)
 
 -- // Manual Teleport Logic (Dropdown) //
 local function populateDropdownOptions()
-    -- Clear existing options
     for _, child in ipairs(TeleportDropdownOptionsFrame:GetChildren()) do
-        if child:IsA("TextButton") then -- Hanya hapus TextButton (opsi)
+        if child:IsA("TextButton") then
             child:Destroy()
         end
     end
@@ -726,7 +732,7 @@ local function populateDropdownOptions()
         if teleportLocations[locationName] then
             numOptionsAdded = numOptionsAdded + 1
             local optionButton = Instance.new("TextButton")
-            optionButton.Name = "Option_" .. locationName:gsub("%s+", "") -- Nama unik
+            optionButton.Name = "Option_" .. locationName:gsub("%s+", "")
             optionButton.Parent = TeleportDropdownOptionsFrame
             optionButton.Size = UDim2.new(1, 0, 0, optionHeight)
             optionButton.Text = locationName
@@ -737,7 +743,7 @@ local function populateDropdownOptions()
             optionButton.BorderSizePixel = 0
             optionButton.TextXAlignment = Enum.TextXAlignment.Left
             optionButton.TextWrapped = true
-            optionButton.LayoutOrder = i -- Untuk UIListLayout
+            optionButton.LayoutOrder = i
 
             optionButton.MouseEnter:Connect(function() optionButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60) end)
             optionButton.MouseLeave:Connect(function() optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45) end)
@@ -752,7 +758,6 @@ local function populateDropdownOptions()
         end
     end
     appendLog(numOptionsAdded .. " teleport options loaded into dropdown.")
-    -- AutomaticCanvasSize akan menangani CanvasSize.Y
 end
 
 TeleportLocationSelector.MouseButton1Click:Connect(function()
@@ -763,7 +768,7 @@ TeleportLocationSelector.MouseButton1Click:Connect(function()
         LogFrame.Position = UDim2.new(LogFrame.Position.X.Scale, LogFrame.Position.X.Offset, originalLogFramePositionYScale, originalLogFramePositionYOffset)
     else
         populateDropdownOptions()
-        task.wait() -- Beri waktu UIListLayout & AutomaticCanvasSize untuk update
+        task.wait() 
 
         local dropdownContentHeight = TeleportDropdownOptionsFrame.CanvasSize.Y.Offset
         if dropdownContentHeight == 0 then
@@ -775,7 +780,7 @@ TeleportLocationSelector.MouseButton1Click:Connect(function()
         end
 
         local desiredDropdownHeight = math.min(150, dropdownContentHeight)
-        TeleportDropdownOptionsFrame.Size = UDim2.new(0, TeleportLocationSelector.AbsoluteSize.X, 0, desiredDropdownHeight) -- Gunakan AbsoluteSize untuk lebar yang konsisten
+        TeleportDropdownOptionsFrame.Size = UDim2.new(0, TeleportLocationSelector.AbsoluteSize.X, 0, desiredDropdownHeight)
 
         local selectorAbsolutePos = TeleportLocationSelector.AbsolutePosition
         local frameAbsolutePos = Frame.AbsolutePosition
@@ -857,7 +862,7 @@ end)
 -- // Water Drink Timer Loop //
 task.spawn(function()
     while scriptRunning do
-        waitSeconds(1) -- Gunakan waitSeconds agar bisa diinterupsi oleh scriptRunning = false
+        waitSeconds(1)
         if not scriptRunning then break end
         waterDrinkTimer = waterDrinkTimer + 1
         if waterDrinkTimer >= timers.water_drink_interval then
@@ -908,12 +913,18 @@ task.spawn(function()
             end
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
             Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v)
-        else
-            Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-            Frame.BorderColor3 = Color3.fromRGB(255, 0, 0)
-            Frame.BorderSizePixel = borderThicknessBase
-            Frame.BackgroundTransparency = 0
-            -- Frame.Position tidak perlu direset di sini karena sudah diatur oleh toggleMinimize
+        else -- Saat diminimize
+            if minimizedElement and minimizedElement.Parent then -- Pastikan elemen Z ada
+                Frame.BackgroundColor3 = minimizedElement.BackgroundColor3
+                Frame.BorderColor3 = minimizedElement.BorderColor3
+                Frame.BorderSizePixel = minimizedElement.BorderSizePixel
+                Frame.BackgroundTransparency = minimizedElement.BackgroundTransparency
+            else -- Fallback jika elemen Z tidak ada (seharusnya tidak terjadi)
+                Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+                Frame.BorderColor3 = Color3.fromRGB(255, 0, 0)
+                Frame.BorderSizePixel = borderThicknessBase
+                Frame.BackgroundTransparency = 0
+            end
         end
         task.wait(0.05)
     end
@@ -966,7 +977,7 @@ task.spawn(function()
             UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
             UiTitleLabel.Position = originalPos
             UiTitleLabel.Rotation = 0
-            waitSeconds(displayTime) -- Gunakan waitSeconds
+            waitSeconds(displayTime)
             if not scriptRunning then break end
             if currentTargetText == originalText1 then currentTargetText = originalText2 else currentTargetText = originalText1 end
         else
@@ -986,7 +997,7 @@ task.spawn(function()
     while ScreenGui and ScreenGui.Parent and scriptRunning do
         if not isMinimized then
             for _, btn in ipairs(buttonsToAnimate) do
-                if btn and btn.Parent then
+                if btn and btn.Parent and btn.Visible then -- Hanya animasi jika terlihat
                     local originalBorder = btn.BorderColor3
                     if btn.Name == "StartAutoTeleportButton" and autoTeleportActive then
                         btn.BorderColor3 = Color3.fromRGB(255,100,100)
@@ -1003,9 +1014,10 @@ end)
 
 task.spawn(function()
     while ScreenGui and ScreenGui.Parent and scriptRunning do
-        if isMinimized and minimizedZLabel.Visible then
+        if isMinimized and minimizedElement and minimizedElement.Visible then -- Periksa minimizedElement
             local hue = (tick() * 0.2) % 1
-            minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+            minimizedElement.TextColor3 = Color3.fromHSV(hue, 1, 1)
+            minimizedElement.BorderColor3 = Color3.fromHSV((hue + 0.5)%1, 1, 1) -- Animasi border juga
         end
         task.wait(0.05)
     end
@@ -1014,13 +1026,11 @@ end)
 
 -- BindToClose
 game:BindToClose(function()
-    scriptRunning = false -- Hentikan semua loop
-    autoTeleportActive = false -- Hentikan auto teleport jika aktif
+    scriptRunning = false
+    autoTeleportActive = false
     if autoTeleportThread and coroutine.status(autoTeleportThread) ~= "dead" then
-        -- Tidak ada cara aman untuk 'membunuh' thread dari luar di Lua standar Roblox,
-        -- loop di dalam thread harus memeriksa 'scriptRunning'
         appendLog("Waiting for autoTeleportThread to finish...")
-        task.wait(1) -- Beri waktu thread untuk berhenti secara alami
+        task.wait(1)
     end
     if ScreenGui and ScreenGui.Parent then
         pcall(function() ScreenGui:Destroy() end)
@@ -1029,6 +1039,6 @@ game:BindToClose(function()
 end)
 
 -- Inisialisasi
-appendLog("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat.")
+appendLog("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat. Versi Perbaikan UI.")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
