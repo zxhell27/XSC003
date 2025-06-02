@@ -33,6 +33,10 @@ TimerTitleLabel.Name = "TimerTitle"
 local ApplyTimersButton = Instance.new("TextButton")
 ApplyTimersButton.Name = "ApplyTimersButton"
 
+-- Label khusus untuk pop-up 'Z' saat diminimize (DIKEMBALIKAN)
+local minimizedZLabel = Instance.new("TextLabel")
+minimizedZLabel.Name = "MinimizedZLabel"
+
 -- Tabel untuk menyimpan referensi elemen input timer dan tombol manual
 local timerInputElements = {}
 local manualTeleportButtons = {}
@@ -45,7 +49,7 @@ local isMinimized = false
 local originalFrameSize = UDim2.new(0, 260, 0, 550) -- Ukuran UI diperbesar untuk menampung konten
 local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
 
--- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton TIDAK termasuk di sini)
+-- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton dan Frame TIDAK termasuk di sini)
 local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibuat
 
 -- --- Tabel Konfigurasi Timer Global ---
@@ -121,20 +125,29 @@ local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 
 local function setupCoreGuiParenting()
+    -- Pastikan ScreenGui ada dan diparenting dengan benar
     if not ScreenGui.Parent or ScreenGui.Parent ~= CoreGui then
-        ScreenGui.Parent = CoreGui
+        pcall(function() ScreenGui.Parent = CoreGui end)
     end
+    -- Tunggu hingga ScreenGui benar-benar diparenting
+    while not ScreenGui.Parent do task.wait() end
+
+    -- Pastikan Frame ada dan diparenting dengan benar
     if not Frame.Parent or Frame.Parent ~= ScreenGui then
-        Frame.Parent = ScreenGui
+        pcall(function() Frame.Parent = ScreenGui end)
     end
-    -- Pastikan semua elemen UI diparenting di sini
-    UiTitleLabel.Parent = Frame
-    StartButton.Parent = Frame
-    StatusLabel.Parent = Frame
-    MinimizeButton.Parent = Frame
-    ContentScrollFrame.Parent = Frame -- Parentkan ScrollingFrame ke Frame utama
-    TimerTitleLabel.Parent = ContentScrollFrame -- Pindahkan ke ScrollingFrame
-    ApplyTimersButton.Parent = ContentScrollFrame -- Pindahkan ke ScrollingFrame
+    while not Frame.Parent do task.wait() end
+
+    -- Parentkan semua elemen UI ke Frame atau ContentScrollFrame
+    pcall(function() UiTitleLabel.Parent = Frame end)
+    pcall(function() StartButton.Parent = Frame end)
+    pcall(function() StatusLabel.Parent = Frame end)
+    pcall(function() MinimizeButton.Parent = Frame end)
+    pcall(function() ContentScrollFrame.Parent = Frame end)
+    pcall(function() TimerTitleLabel.Parent = ContentScrollFrame end)
+    pcall(function() ApplyTimersButton.Parent = ContentScrollFrame end)
+    pcall(function() minimizedZLabel.Parent = Frame end) -- Parentkan label Z ke Frame
+    pcall(function() minimizedZLabel.Visible = false end) -- Pastikan awalnya tidak terlihat
 end
 
 -- Panggil setupCoreGuiParenting di awal
@@ -325,7 +338,7 @@ local function createManualTeleportButton(step, index)
     button.Parent = ContentScrollFrame
     button.Size = UDim2.new(1, -20, 0, 30)
     button.Position = UDim2.new(0, 10, 0, currentYConfig)
-    button.Text = "TELEPORT TO: " .. string.upper(step.name)
+    button.Text = "TELEPORT KE: " .. string.upper(step.name)
     button.Font = Enum.Font.SourceSansBold
     button.TextSize = 14
     button.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -339,7 +352,10 @@ local function createManualTeleportButton(step, index)
     ButtonCorner.Parent = button
 
     button.MouseButton1Click:Connect(function()
-        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        -- Pastikan karakter dan HumanoidRootPart ada sebelum mencoba teleportasi
+        local character = LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if not hrp then
             updateStatus("ERROR: KARAKTER TIDAK SIAP UNTUK TELEPORT.")
             warn("Karakter atau HumanoidRootPart tidak ditemukan untuk teleport manual.")
             return
@@ -417,14 +433,14 @@ local MinimizeButtonCorner = Instance.new("UICorner")
 MinimizeButtonCorner.CornerRadius = UDim.new(0, 3)
 MinimizeButtonCorner.Parent = MinimizeButton
 
--- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton TIDAK termasuk di sini)
+-- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton dan Frame TIDAK termasuk di sini)
 elementsToToggleVisibility = {
     UiTitleLabel, StartButton, StatusLabel, ContentScrollFrame,
 }
 
 -- // Fungsi Bantu UI //
 local function updateStatus(text)
-    if StatusLabel and StatusLabel.Parent then StatusLabel.Text = "STATUS: " .. string.upper(text) end
+    if StatusLabel and StatusLabel.Parent then pcall(function() StatusLabel.Text = "STATUS: " .. string.upper(text) end) end
 end
 
 -- // Fungsi Animasi UI //
@@ -443,20 +459,12 @@ end
 local function toggleMinimize()
     isMinimized = not isMinimized
     if isMinimized then
-        -- Sembunyikan semua elemen kecuali Frame dan MinimizeButton
+        -- Sembunyikan semua elemen yang harus disembunyikan
         for _, element in ipairs(elementsToToggleVisibility) do
-            if element and element.Parent then element.Visible = false end
+            if element and element.Parent then pcall(function() element.Visible = false end) end
         end
-
-        -- Ubah MinimizeButton menjadi pop-up 'Z'
-        MinimizeButton.Text = "Z"
-        MinimizeButton.TextSize = 40
-        MinimizeButton.TextColor3 = Color3.fromRGB(255, 0, 0) -- Merah
-        MinimizeButton.BackgroundColor3 = Color3.fromRGB(15, 15, 20) -- Sama dengan frame
-        MinimizeButton.BorderColor3 = Color3.fromRGB(255, 0, 0)
-        MinimizeButton.ZIndex = 4 -- Pastikan di atas semua
-        MinimizeButton.Size = UDim2.new(1, 0, 1, 0) -- Isi seluruh Frame
-        MinimizeButton.Position = UDim2.new(0,0,0,0) -- Posisikan di dalam Frame
+        pcall(function() MinimizeButton.Visible = true end) -- Pastikan MinimizeButton tetap terlihat
+        pcall(function() minimizedZLabel.Visible = true end) -- Tampilkan label 'Z'
 
         -- Hitung posisi target pop-up di pojok kanan bawah
         local targetX = 1 - (minimizedFrameSize.X.Offset / ScreenGui.AbsoluteSize.X) - 0.02 -- Sedikit dari kanan
@@ -464,26 +472,18 @@ local function toggleMinimize()
         local targetPosition = UDim2.new(targetX, 0, targetY, 0)
 
         animateFrame(minimizedFrameSize, targetPosition)
-        Frame.Draggable = false -- Matikan draggable saat diminimize untuk mencegah pergeseran
+        pcall(function() Frame.Draggable = false end) -- Matikan draggable saat diminimize
     else
-        -- Kembalikan MinimizeButton ke kondisi semula
-        MinimizeButton.Text = originalMinimizeButtonText
-        MinimizeButton.TextSize = originalMinimizeButtonTextSize
-        MinimizeButton.TextColor3 = originalMinimizeButtonTextColor
-        MinimizeButton.BackgroundColor3 = originalMinimizeButtonBgColor
-        MinimizeButton.BorderColor3 = originalMinimizeButtonBorderColor
-        MinimizeButton.ZIndex = originalMinimizeButtonZIndex
-        MinimizeButton.Size = originalMinimizeButtonSize
-        MinimizeButton.Position = originalMinimizeButtonPosition
+        pcall(function() minimizedZLabel.Visible = false end) -- Sembunyikan label 'Z'
 
         -- Posisikan kembali ke tengah layar (gunakan originalFrameSize untuk posisi yang benar)
         local targetPosition = UDim2.new(0.5, -originalFrameSize.X.Offset/2, 0.5, -originalFrameSize.Y.Offset/2)
         animateFrame(originalFrameSize, targetPosition, function()
             -- Tampilkan semua elemen setelah animasi ukuran selesai
             for _, element in ipairs(elementsToToggleVisibility) do
-                if element and element.Parent then element.Visible = true end
+                if element and element.Parent then pcall(function() element.Visible = true end) end
             end
-            Frame.Draggable = true -- Aktifkan kembali draggable setelah maximize
+            pcall(function() Frame.Draggable = true end) -- Aktifkan kembali draggable setelah maximize
         end)
     end
 end
@@ -499,7 +499,7 @@ local function waitSeconds(sec)
         -- Perbarui status setiap detik saat menunggu
         local remainingTime = math.floor(sec - (tick() - startTime))
         if remainingTime >= 0 then
-            updateStatus(string.format("WAITING: %ds", remainingTime))
+            updateStatus(string.format("MENUNGGU: %ds", remainingTime))
         end
     until not scriptRunning or tick() - startTime >= sec
 end
@@ -511,6 +511,8 @@ local function findObject(baseObject, path)
     local currentObject = baseObject
 
     for i, partName in ipairs(parts) do
+        if not currentObject then return nil end -- Hentikan jika objek induk sudah nil
+
         -- Handle wildcard '%'
         if string.find(partName, "%%") then
             local actualPartName = string.gsub(partName, "%%", "")
@@ -526,10 +528,6 @@ local function findObject(baseObject, path)
         else
             currentObject = currentObject:FindFirstChild(partName)
         end
-
-        if not currentObject then
-            return nil -- Objek tidak ditemukan di sepanjang path
-        end
     end
     return currentObject
 end
@@ -538,15 +536,16 @@ end
 -- targetInstance bisa berupa BasePart atau Model. targetCFrameFallback digunakan jika targetInstance tidak valid.
 local function teleportPlayer(targetInstance, targetCFrameFallback)
     local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+
+    if not hrp then
         warn("HumanoidRootPart tidak ditemukan atau karakter tidak ada.")
         return false
     end
-    local hrp = character.HumanoidRootPart
 
     -- Pastikan HumanoidRootPart tidak di-anchored atau di-locked
-    hrp.Anchored = false
-    hrp.CanCollide = false -- Agar tidak tersangkut
+    pcall(function() hrp.Anchored = false end)
+    pcall(function() hrp.CanCollide = false end) -- Agar tidak tersangkut
 
     local actualCFrame = targetCFrameFallback -- Default ke CFrame fallback
 
@@ -560,14 +559,20 @@ local function teleportPlayer(targetInstance, targetCFrameFallback)
         end
     end
 
-    hrp.CFrame = actualCFrame
+    pcall(function() hrp.CFrame = actualCFrame end)
     task.wait(timers.genericShortDelay) -- Beri sedikit waktu untuk fisika
-    hrp.CanCollide = true
+    pcall(function() hrp.CanCollide = true end)
     return true
 end
 
 -- // Fungsi utama siklus teleportasi //
 local function runTeleportCycle()
+    -- Tunggu hingga karakter pemain siap
+    while not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") do
+        updateStatus("MENUNGGU KARAKTER...")
+        task.wait(1)
+    end
+
     for i, step in ipairs(teleportSequence) do
         if not scriptRunning then break end
 
@@ -575,12 +580,11 @@ local function runTeleportCycle()
         print("Mencoba teleportasi ke: " .. step.name)
 
         local targetInstance = nil
-        if step.path then
+        local successFind = pcall(function()
             local potentialParent = findObject(game.Workspace, step.path)
             if potentialParent then
                 print("Objek potensial ditemukan melalui path: " .. potentialParent.Name)
                 if step.childIndex then
-                    -- Jika childIndex ditentukan, coba cari anak spesifik
                     local children = potentialParent:GetChildren()
                     if step.childIndex > 0 and step.childIndex <= #children then
                         local specificChild = children[step.childIndex]
@@ -596,17 +600,22 @@ local function runTeleportCycle()
                         targetInstance = potentialParent -- Fallback ke induk jika indeks tidak valid
                     end
                 else
-                    -- Tidak ada childIndex, gunakan objek yang ditemukan
                     targetInstance = potentialParent
                 end
             else
                 warn("Tidak dapat menemukan objek target melalui path: " .. step.path .. ". Menggunakan CFrame fallback yang ditentukan.")
             end
+        end)
+
+        if not successFind then
+            warn("Error saat mencari objek: " .. tostring(successFind))
+            updateStatus("ERROR: PENCARIAN OBJEK GAGAL.")
+            -- Lanjutkan dengan CFrame fallback jika pencarian gagal
         end
 
-        local success = teleportPlayer(targetInstance, step.cframe) -- Lewati targetInstance dan CFrame fallback
+        local successTeleport = teleportPlayer(targetInstance, step.cframe)
 
-        if not success then
+        if not successTeleport then
             updateStatus("TELEPORT GAGAL: " .. step.name)
             warn("Teleportasi gagal untuk: " .. step.name)
             scriptRunning = false -- Hentikan skrip jika teleportasi gagal
@@ -627,9 +636,9 @@ end
 StartButton.MouseButton1Click:Connect(function()
     scriptRunning = not scriptRunning
     if scriptRunning then
-        StartButton.Text = "SYSTEM_ACTIVE"
-        StartButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30) -- Merah menyala
-        StartButton.TextColor3 = Color3.fromRGB(255,255,255)
+        pcall(function() StartButton.Text = "SYSTEM_ACTIVE" end)
+        pcall(function() StartButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30) end) -- Merah menyala
+        pcall(function() StartButton.TextColor3 = Color3.fromRGB(255,255,255) end)
         updateStatus("INIT_SEQUENCE")
         if not mainCycleThread or coroutine.status(mainCycleThread) == "dead" then
             mainCycleThread = task.spawn(function()
@@ -640,9 +649,9 @@ StartButton.MouseButton1Click:Connect(function()
                     task.wait(1)
                 end
                 updateStatus("SYSTEM_HALTED")
-                StartButton.Text = "START SEQUENCE"
-                StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
-                StartButton.TextColor3 = Color3.fromRGB(220,220,220)
+                pcall(function() StartButton.Text = "START SEQUENCE" end)
+                pcall(function() StartButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20) end)
+                pcall(function() StartButton.TextColor3 = Color3.fromRGB(220,220,220) end)
             end)
         end
     else
@@ -656,14 +665,20 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     for i, step in ipairs(teleportSequence) do
         local inputElement = timerInputElements["TimerInput_" .. i]
         local labelElement = timerInputElements["TimerLabel_" .. i]
-        local value = tonumber(inputElement.Text)
+        
+        if inputElement and labelElement then -- Pastikan elemen UI ada
+            local value = tonumber(inputElement.Text)
 
-        if value and value >= 0 then
-            teleportSequence[i].waitAfter = value
-            if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(80,255,80) end) end
+            if value and value >= 0 then
+                teleportSequence[i].waitAfter = value
+                pcall(function() labelElement.TextColor3 = Color3.fromRGB(80,255,80) end)
+            else
+                allTimersValid = false
+                pcall(function() labelElement.TextColor3 = Color3.fromRGB(255,80,80) end)
+            end
         else
+            warn("Elemen input timer atau label tidak ditemukan untuk langkah " .. i)
             allTimersValid = false
-            if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(255,80,80) end) end
         end
     end
 
@@ -690,29 +705,29 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Background)
     local borderBase = Color3.fromRGB(255,0,0)
     local borderGlitch = Color3.fromRGB(0,255,255)
 
-    while ScreenGui and ScreenGui.Parent do
+    while ScreenGui and ScreenGui.Parent and Frame and Frame.Parent do -- Tambahkan pemeriksaan Frame.Parent
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             local r = math.random()
             if r < 0.05 then -- Glitch intens
-                Frame.BackgroundColor3 = glitchColor1
-                Frame.BorderColor3 = borderGlitch
+                pcall(function() Frame.BackgroundColor3 = glitchColor1 end)
+                pcall(function() Frame.BorderColor3 = borderGlitch end)
                 task.wait(0.05)
-                Frame.BackgroundColor3 = glitchColor2
+                pcall(function() Frame.BackgroundColor3 = glitchColor2 end)
                 task.wait(0.05)
             elseif r < 0.2 then -- Glitch ringan
-                Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random())
-                Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.5)
+                pcall(function() Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random()) end)
+                pcall(function() Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.5) end)
                 task.wait(0.1)
             else
-                Frame.BackgroundColor3 = baseColor
-                Frame.BorderColor3 = borderBase
+                pcall(function() Frame.BackgroundColor3 = baseColor end)
+                pcall(function() Frame.BorderColor3 = borderBase end)
             end
             -- Animasi border utama (HSV shift)
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
-            Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v)
+            pcall(function() Frame.BorderColor3 = Color3.fromHSV((h + 0.005)%1, s, v) end)
         else -- Jika diminimize, pastikan warna kembali normal untuk 'Z'
-            Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-            Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
+            pcall(function() Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20) end)
+            pcall(function() Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) end) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
         end
         task.wait(0.05)
     end
@@ -725,7 +740,7 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
     local baseColor = Color3.fromRGB(255, 25, 25)
     local originalPos = UiTitleLabel.Position
 
-    while ScreenGui and ScreenGui.Parent do
+    while ScreenGui and ScreenGui.Parent and UiTitleLabel and UiTitleLabel.Parent do -- Tambahkan pemeriksaan UiTitleLabel.Parent
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             local r = math.random()
             local isGlitchingText = false
@@ -740,23 +755,23 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
                         newText = newText .. originalText:sub(i,i)
                     end
                 end
-                UiTitleLabel.Text = newText
-                UiTitleLabel.TextColor3 = Color3.fromRGB(math.random(200,255), math.random(0,50), math.random(0,50))
-                UiTitleLabel.Position = originalPos + UDim2.fromOffset(math.random(-2,2), math.random(-2,2))
-                UiTitleLabel.Rotation = math.random(-1,1) * 0.5
+                pcall(function() UiTitleLabel.Text = newText end)
+                pcall(function() UiTitleLabel.TextColor3 = Color3.fromRGB(math.random(200,255), math.random(0,50), math.random(0,50)) end)
+                pcall(function() UiTitleLabel.Position = originalPos + UDim2.fromOffset(math.random(-2,2), math.random(-2,2)) end)
+                pcall(function() UiTitleLabel.Rotation = math.random(-1,1) * 0.5 end)
                 task.wait(0.07)
             elseif r < 0.1 then -- Glitch Warna & Stroke
-                UiTitleLabel.TextColor3 = Color3.fromHSV(math.random(), 1, 1)
-                UiTitleLabel.TextStrokeColor3 = Color3.fromHSV(math.random(), 0.8, 1)
-                UiTitleLabel.TextStrokeTransparency = math.random() * 0.3
-                UiTitleLabel.Rotation = math.random(-1,1) * 0.2
+                pcall(function() UiTitleLabel.TextColor3 = Color3.fromHSV(math.random(), 1, 1) end)
+                pcall(function() UiTitleLabel.TextStrokeColor3 = Color3.fromHSV(math.random(), 0.8, 1) end)
+                pcall(function() UiTitleLabel.TextStrokeTransparency = math.random() * 0.3 end)
+                pcall(function() UiTitleLabel.Rotation = math.random(-1,1) * 0.2 end)
                 task.wait(0.1)
             else -- Kembali normal atau animasi warna halus
-                UiTitleLabel.Text = originalText
-                UiTitleLabel.TextStrokeTransparency = 0.5
-                UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
-                UiTitleLabel.Position = originalPos
-                UiTitleLabel.Rotation = 0
+                pcall(function() UiTitleLabel.Text = originalText end)
+                pcall(function() UiTitleLabel.TextStrokeTransparency = 0.5 end)
+                pcall(function() UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0) end)
+                pcall(function() UiTitleLabel.Position = originalPos end)
+                pcall(function() UiTitleLabel.Rotation = 0 end)
             end
 
             -- Animasi warna RGB halus jika tidak sedang glitch parah
@@ -766,7 +781,7 @@ task.spawn(function() -- Animasi UiTitleLabel (ZXHELL Glitch)
                 r_rgb = math.min(1, r_rgb + 0.6) -- Dominasi merah
                 g_rgb = g_rgb * 0.4
                 b_rgb = b_rgb * 0.4
-                UiTitleLabel.TextColor3 = Color3.new(r_rgb, g_rgb, b_rgb)
+                pcall(function() UiTitleLabel.TextColor3 = Color3.new(r_rgb, g_rgb, b_rgb) end)
             end
         end
         task.wait(0.05)
@@ -776,23 +791,21 @@ end)
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     local buttonsToAnimate = {StartButton, ApplyTimersButton, MinimizeButton}
     while ScreenGui and ScreenGui.Parent do
-        -- Animasi ini harus selalu berjalan, terlepas dari isMinimized,
-        -- karena MinimizeButton sekarang mengambil peran 'Z' saat diminimize.
         for _, btn in ipairs(buttonsToAnimate) do
             if btn and btn.Parent then
                 local originalBorder = btn.BorderColor3
 
                 -- Efek hover/pulse sederhana pada border
                 if btn.Name == "StartButton" and scriptRunning then
-                    btn.BorderColor3 = Color3.fromRGB(255,100,100) -- Merah lebih terang saat running
+                    pcall(function() btn.BorderColor3 = Color3.fromRGB(255,100,100) end) -- Merah lebih terang saat running
                 elseif btn.Name == "MinimizeButton" and isMinimized then
                     -- Animasi khusus untuk tombol minimize saat menjadi 'Z'
                     local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
-                    btn.TextColor3 = Color3.fromHSV(hue, 1, 1)
-                    btn.BorderColor3 = Color3.fromHSV(hue, 1, 1) -- Border juga ikut berkedip
+                    pcall(function() minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1) end) -- Animasi 'Z' label
+                    pcall(function() minimizedZLabel.BorderColor3 = Color3.fromHSV(hue, 1, 1) end) -- Border 'Z' label juga ikut berkedip
                 else
                     local h,s,v = Color3.toHSV(originalBorder)
-                    btn.BorderColor3 = Color3.fromHSV(h,s, math.sin(tick()*2)*0.1 + 0.9) -- Pulse V
+                    pcall(function() btn.BorderColor3 = Color3.fromHSV(h,s, math.sin(tick()*2)*0.1 + 0.9) end) -- Pulse V
                 end
             end
         end
@@ -800,6 +813,16 @@ task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     end
 end)
 
+task.spawn(function() -- Animasi Pop-up 'Z' (RGB Pulse)
+    while ScreenGui and ScreenGui.Parent and minimizedZLabel and minimizedZLabel.Parent do
+        if isMinimized and minimizedZLabel.Visible then
+            local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
+            pcall(function() minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1) end)
+            pcall(function() minimizedZLabel.BorderColor3 = Color3.fromHSV(hue, 1, 1) end)
+        end
+        task.wait(0.05)
+    end
+end)
 -- --- END ANIMASI UI ---
 
 -- BindToClose
@@ -812,5 +835,5 @@ end)
 -- Inisialisasi
 print("Skrip Otomatisasi Teleportasi (Versi UI Canggih) Telah Dimuat.")
 task.wait(1)
-if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
+if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then pcall(function() StatusLabel.Text = "STATUS: STANDBY" end) end
 
