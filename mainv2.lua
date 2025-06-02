@@ -52,7 +52,7 @@ local scriptRunning = true
 local autoTeleportActive = false
 local autoTeleportThread = nil
 local isMinimized = false
-local originalFrameHeight = 395 -- Adjusted height after removing one timer input
+local originalFrameHeight = 370 -- Adjusted height: removed one timer input (25px)
 local originalFrameWidth = 300
 originalFrameSize = UDim2.new(0, originalFrameWidth, 0, originalFrameHeight)
 local minimizedFrameSize = UDim2.new(0, 50, 0, 50)
@@ -63,15 +63,14 @@ local elementsToToggleVisibility = {}
 
 -- --- Tabel Konfigurasi Timer ---
 local timers = {
-    -- teleport_wait_time is now dynamic, removed from here
     teleport_delay_between_points = 5,
     log_clear_interval = 60,
     teleport_y_offset = 8, 
     water_refill_duration = 2, 
-    water_drink_interval = 300,
-    water_drink_count = 5,
-    jump_at_checkpoint_interval = 5, -- Interval lompat di checkpoint (detik)
-    camp_water_refill_interval = 120, -- Interval isi air di camp (detik) = 2 menit
+    -- water_drink_interval is now handled specifically by the special sequence (60s)
+    water_drink_count = 5, 
+    -- jump_at_checkpoint_interval is not used in this specific script
+    -- camp_water_refill_interval is not used as refill is tied to drinking at Camp 4
 }
 
 -- --- Definisi Titik Teleportasi (Ekspedisi Antartika) ---
@@ -94,10 +93,10 @@ local teleportLocations = {
     ["WaterRefill_Camp4"] = CFrame.new(9000.68652, 597.380127, 85.107872, 2.74181366e-06, -0.18581143, 0.982585371, 1, 2.74181366e-06, -2.2649765e-06, -2.2649765e-06, 0.982585371, 0.18581146),
     -- South Pole
     ["South Pole Checkpoint"] = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05),
+    ["South Pole Staging Area"] = CFrame.new(10995.2461, 545.255127, 114.804474 - 50) -- 50 studs before the checkpoint on Z axis
 }
 
-local waterDrinkTimer = 0
-local waterDrinkCounter = 0
+local waterDrinkCounter = 0 -- Kept for logging in drinkWater()
 local glitchChars = {"@", "#", "$", "%", "&", "*", "!", "?", "/", "\\", "|", "_", "1", "0", "Z", "X", "E"}
 
 local energyHydrationEvent = ReplicatedStorage:WaitForChild("Events", 60):WaitForChild("EnergyHydration", 60)
@@ -153,7 +152,7 @@ local yOffsetForTitle = 50
 
 StartAutoTeleportButton.Size = UDim2.new(1, -40, 0, 35)
 StartAutoTeleportButton.Position = UDim2.new(0, 20, 0, yOffsetForTitle)
-StartAutoTeleportButton.Text = "START AUTO TELEPORT"
+StartAutoTeleportButton.Text = "START SOUTH POLE SEQUENCE" -- Changed button text
 StartAutoTeleportButton.Font = Enum.Font.SourceSansBold
 StartAutoTeleportButton.TextSize = 16
 StartAutoTeleportButton.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -184,7 +183,7 @@ local yOffsetForTimers = yOffsetForTitle + 100
 
 TimerTitleLabel.Size = UDim2.new(1, -40, 0, 20)
 TimerTitleLabel.Position = UDim2.new(0, 20, 0, yOffsetForTimers)
-TimerTitleLabel.Text = "// AUTO TELEPORT SETTINGS"
+TimerTitleLabel.Text = "// SEQUENCE SETTINGS" -- Changed title
 TimerTitleLabel.Font = Enum.Font.Code
 TimerTitleLabel.TextSize = 14
 TimerTitleLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
@@ -229,15 +228,13 @@ local function createTimerInput(name, yPos, labelText, initialValue)
 end
 
 local currentYConfig = 30
--- TeleportWaitTime input removed
 timerInputElements.teleportDelayBetweenPointsInput = createTimerInput("TeleportDelayBetweenPoints", currentYConfig, "Delay Between Points", timers.teleport_delay_between_points)
 currentYConfig = currentYConfig + 25
 timerInputElements.waterRefillDurationInput = createTimerInput("WaterRefillDuration", currentYConfig, "Water Refill Duration", timers.water_refill_duration)
 currentYConfig = currentYConfig + 25
-timerInputElements.waterDrinkIntervalInput = createTimerInput("WaterDrinkInterval", currentYConfig, "Water Drink Interval", timers.water_drink_interval)
-currentYConfig = currentYConfig + 25
+-- WaterDrinkInterval input removed
 timerInputElements.waterDrinkCountInput = createTimerInput("WaterDrinkCount", currentYConfig, "Water Drink Count", timers.water_drink_count)
-currentYConfig = currentYConfig + 35
+currentYConfig = currentYConfig + 35 -- Adjusted offset as one input was removed
 
 ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30)
 ApplyTimersButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers)
@@ -327,11 +324,9 @@ minimizedElement.AutoButtonColor = false
 
 elementsToToggleVisibility = {
     UiTitleLabel, StartAutoTeleportButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
-    -- timerInputElements.TeleportWaitTimeLabel, -- Removed
-    -- timerInputElements.teleportWaitTimeInput, -- Removed
     timerInputElements.TeleportDelayBetweenPointsLabel, timerInputElements.teleportDelayBetweenPointsInput,
     timerInputElements.WaterRefillDurationLabel, timerInputElements.WaterRefillDurationInput,
-    timerInputElements.WaterDrinkIntervalLabel, timerInputElements.WaterDrinkIntervalInput,
+    -- timerInputElements.WaterDrinkIntervalLabel, timerInputElements.WaterDrinkIntervalInput, -- Removed
     timerInputElements.WaterDrinkCountLabel, timerInputElements.WaterDrinkCountInput,
     LogFrame, MinimizeButton
 }
@@ -481,21 +476,26 @@ local function teleportPlayer(cframeTarget, locationName)
     return true
 end
 
--- Fungsi untuk mengisi air
+-- Fungsi untuk mengisi air (modifikasi mungkin tidak diperlukan jika pemanggilan sudah benar)
 local function refillWater(currentCampNameKey) 
     if not scriptRunning or not LocalPlayer or not LocalPlayer.Character then
         appendLog("RefillWater: Script not running or player/character missing.")
         return false
     end
 
-    local campNumberMatch = currentCampNameKey:match("Camp (%d)")
-    if not campNumberMatch then
-        appendLog("RefillWater: Could not determine camp number from: " .. currentCampNameKey .. " for refill event.")
-        return false -- Cannot proceed without camp number for event
+    local campNumberMatch = currentCampNameKey:match("Camp (%d)") -- Expects "Camp X"
+    if not campNumberMatch then 
+        -- Try matching if only number is passed, e.g. "4" for Camp 4
+        if tonumber(currentCampNameKey) then
+             campNumberMatch = currentCampNameKey
+        else
+            appendLog("RefillWater: Could not determine camp number from: " .. currentCampNameKey .. " for refill event.")
+            return false
+        end
     end
+
     local campIdForEvent = "Camp" .. campNumberMatch 
     local campIdForLogic = "Camp " .. campNumberMatch 
-
     local waterRefillLocationName = "WaterRefill_Camp" .. campNumberMatch
     local refillCFrame = teleportLocations[waterRefillLocationName]
 
@@ -527,7 +527,6 @@ local function refillWater(currentCampNameKey)
             end
             
             appendLog("RefillWater: Water refill process attempted for " .. campIdForLogic)
-            -- No longer using hasRefilledWaterAtCurrentCamp or lastRefillCampName for this logic
             return true
         else
             appendLog("RefillWater: Failed to teleport to water refill point for " .. campIdForLogic .. ".")
@@ -550,131 +549,124 @@ local function drinkWater()
                 if not scriptRunning then break end
                 remoteEvent:FireServer()
                 appendLog("Drinking water (" .. i .. "/" .. timers.water_drink_count .. " times)")
-                task.wait(0.5)
+                task.wait(0.5) -- Small delay between sips
             end
             appendLog("Finished drinking water.")
-            waterDrinkCounter = 0
+            waterDrinkCounter = waterDrinkCounter + 1 -- Increment after a full drinking session
         else appendLog("RemoteEvent for DRINKING not found in Water Bottle.") end
     else appendLog("Water Bottle not found in character for drinking.") end
 end
 
--- // Fungsi Auto Teleport //
-local function autoTeleportCycle()
-    local locations = {
-        "Camp 1 Main Tent", "Camp 1 Checkpoint",
-        "Camp 2 Main Tent", "Camp 2 Checkpoint",
-        "Camp 3 Main Tent", "Camp 3 Checkpoint",
-        "Camp 4 Main Tent", "Camp 4 Checkpoint",
-        "South Pole Checkpoint"
-    }
-    local currentPointIndex = 1
+-- // Fungsi Auto Teleport KHUSUS //
+local function specialSouthPoleTeleportCycle()
+    local baseCampLocationName = "Camp 1 Main Tent"
+    local southPoleStagingLocationName = "South Pole Staging Area"
+    local southPoleCheckpointLocationName = "South Pole Checkpoint"
+    local camp4NameForRefill = "Camp 4" -- Key to pass to refillWater for Camp 4
 
-    while autoTeleportActive and scriptRunning do
-        local originalLocationName = locations[currentPointIndex]
-        local originalCFrameTarget = teleportLocations[originalLocationName]
+    local timeToWaitAtStaging = (13 * 60) + 59 -- 13 menit 59 detik
+    local drinkWaterInterval = 60 -- 1 menit
+    local timeSinceLastDrink = 0
 
-        if not originalCFrameTarget then
-            appendLog("Error: CFrame not found for location: " .. originalLocationName)
-            updateStatus("ERROR: LOCATION_NOT_FOUND")
-            waitSeconds(5)
-            currentPointIndex = currentPointIndex + 1
-            if currentPointIndex > #locations then currentPointIndex = 1 end
-            continue 
-        end
-        
-        updateStatus("Auto-teleporting to: " .. originalLocationName)
-        appendLog("AutoTeleport: Starting auto-teleport to: " .. originalLocationName)
+    -- 1. Teleport ke Basecamp (Camp 1 Main Tent)
+    updateStatus("Teleporting to Basecamp: " .. baseCampLocationName)
+    if not teleportPlayer(teleportLocations[baseCampLocationName], baseCampLocationName) then
+        appendLog("SpecialSequence: Failed to teleport to Basecamp. Halting.")
+        updateStatus("FAILED_BASECAMP_TELEPORT")
+        return
+    end
+    appendLog("SpecialSequence: Arrived at Basecamp. Delaying before next step...")
+    waitSeconds(timers.teleport_delay_between_points)
+    if not autoTeleportActive or not scriptRunning then return end
 
-        if not teleportPlayer(originalCFrameTarget, originalLocationName) then
-            appendLog("AutoTeleport: Teleport failed for " .. originalLocationName .. ". Retrying in 5 seconds...")
-            waitSeconds(5)
-            if not scriptRunning then break end
-            -- If initial teleport fails, we might skip water refill for this attempt
-        else
-            -- Successful teleport to the location
-            local mainWaitTime
-            local isCheckpoint = originalLocationName:find("Checkpoint")
-            local isAtCamp = originalLocationName:find("Camp") -- Ini akan true untuk "Camp X Main Tent"
+    -- 2. Teleport ke South Pole Staging Area
+    updateStatus("Teleporting to: " .. southPoleStagingLocationName)
+    if not teleportPlayer(teleportLocations[southPoleStagingLocationName], southPoleStagingLocationName) then
+        appendLog("SpecialSequence: Failed to teleport to South Pole Staging Area. Halting.")
+        updateStatus("FAILED_STAGING_TELEPORT")
+        return
+    end
+    appendLog("SpecialSequence: Arrived at South Pole Staging Area.")
+    
+    local currentStagingWaitTime = 0
+    timeSinceLastDrink = 0 -- Reset drink timer upon arrival at staging
 
-            if isCheckpoint then
-                mainWaitTime = 30 -- Waktu tunggu di checkpoint diubah menjadi 30 detik
-            else -- Asumsikan Main Tent (Camp)
-                mainWaitTime = 120 -- Waktu tunggu di camp/main tent diubah menjadi 2 menit (120 detik)
-            end
+    appendLog("SpecialSequence: Waiting at Staging Area for " .. timeToWaitAtStaging .. "s. Drinking every " .. drinkWaterInterval .. "s.")
 
-            appendLog("AutoTeleport: Waiting for " .. mainWaitTime .. " seconds at " .. originalLocationName)
-            local remainingTime = mainWaitTime
-            local jumpTimer = 0
-            local campWaterRefillTimer = 0
+    while currentStagingWaitTime < timeToWaitAtStaging and autoTeleportActive and scriptRunning do
+        local loopIterationWait = 1 
+        waitSeconds(loopIterationWait) 
+        if not autoTeleportActive or not scriptRunning then break end -- Check again after wait
+
+        currentStagingWaitTime = currentStagingWaitTime + loopIterationWait
+        timeSinceLastDrink = timeSinceLastDrink + loopIterationWait
+
+        local remainingStagingTime = timeToWaitAtStaging - currentStagingWaitTime
+        local nextDrinkIn = drinkWaterInterval - (timeSinceLastDrink % drinkWaterInterval)
+        if timeSinceLastDrink >= drinkWaterInterval then nextDrinkIn = 0 end -- If it's time, show 0
+
+        updateStatus(string.format("STAGING: %ds left. Next Drink: %ds", math.floor(remainingStagingTime), math.floor(nextDrinkIn)))
+
+        if timeSinceLastDrink >= drinkWaterInterval then
+            appendLog("SpecialSequence: Time to drink water at Staging Area.")
             
-            if isAtCamp and not isCheckpoint then -- Hanya jalankan timer refill jika di Main Tent, bukan di checkpoint camp
-                campWaterRefillTimer = timers.camp_water_refill_interval -- Mulai timer isi air di camp
-                appendLog("AutoTeleport: Water refill timer started (" .. timers.camp_water_refill_interval .. "s) at " .. originalLocationName)
+            local playerCurrentCFrame = nil
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                playerCurrentCFrame = char.HumanoidRootPart.CFrame
+            else
+                appendLog("SpecialSequence: Cannot get player CFrame before drinking. Will not be able to return accurately.")
             end
 
-            while remainingTime > 0 and autoTeleportActive and scriptRunning do
-                local statusText = string.format("Auto-teleport: %s (%ds left)", originalLocationName, math.floor(remainingTime))
-                if isAtCamp and not isCheckpoint then
-                    statusText = statusText .. string.format(". Refill in: %ds", math.floor(campWaterRefillTimer))
+            drinkWater() 
+            
+            if not autoTeleportActive or not scriptRunning then break end 
+
+            appendLog("SpecialSequence: Attempting to refill water at Camp 4.")
+            if refillWater(camp4NameForRefill) then 
+                appendLog("SpecialSequence: Water refill at Camp 4 attempted.")
+            else
+                appendLog("SpecialSequence: Water refill at Camp 4 failed or was skipped.")
+            end
+
+            if not autoTeleportActive or not scriptRunning then break end
+
+            if playerCurrentCFrame then
+                appendLog("SpecialSequence: Returning to Staging Area after water routine.")
+                if not teleportPlayer(playerCurrentCFrame, "Return to " .. southPoleStagingLocationName .. " (after water)") then
+                    appendLog("SpecialSequence: Failed to return to Staging Area. Trying direct teleport.")
+                    teleportPlayer(teleportLocations[southPoleStagingLocationName], southPoleStagingLocationName .. " (Fallback Return)")
                 end
-                updateStatus(statusText)
-                
-                waitSeconds(1) 
-                remainingTime = remainingTime - 1
-
-                if isCheckpoint then
-                    jumpTimer = jumpTimer + 1
-                    if jumpTimer >= timers.jump_at_checkpoint_interval then
-                        local char = LocalPlayer.Character
-                        if char and char:FindFirstChildOfClass("Humanoid") then
-                            local humanoid = char:FindFirstChildOfClass("Humanoid")
-                            if humanoid:GetState() ~= Enum.HumanoidStateType.Dead and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
-                                humanoid.Jump = true
-                                -- appendLog("AutoTeleport: Jumped at " .. originalLocationName) -- Bisa jadi terlalu spammy
-                            end
-                        end
-                        jumpTimer = 0 
-                    end
-                end
-
-                if isAtCamp and not isCheckpoint then -- Hanya jalankan logika refill jika di Main Tent
-                    campWaterRefillTimer = campWaterRefillTimer - 1
-                    if campWaterRefillTimer <= 0 then
-                        appendLog("AutoTeleport: Camp water refill timer elapsed at " .. originalLocationName .. ". Attempting refill.")
-                        if refillWater(originalLocationName) then
-                            if scriptRunning then
-                                appendLog("AutoTeleport: Returning to " .. originalLocationName .. " after scheduled water refill.")
-                                if not teleportPlayer(originalCFrameTarget, originalLocationName .. " (Return after camp refill)") then
-                                    appendLog("AutoTeleport: Failed to return to " .. originalLocationName .. " after camp refill.")
-                                end
-                            end
-                        else
-                            appendLog("AutoTeleport: Scheduled camp water refill process failed or was skipped for " .. originalLocationName)
-                        end
-                        campWaterRefillTimer = timers.camp_water_refill_interval -- Reset water refill timer
-                        if not scriptRunning or not autoTeleportActive then break end 
-                    end
-                end
-            end -- End of while remainingTime > 0
-        end -- End of else (successful initial teleport)
-        
-        if not scriptRunning or not autoTeleportActive then break end
-
-        currentPointIndex = currentPointIndex + 1
-        if currentPointIndex > #locations then
-            currentPointIndex = 1
-            appendLog("AutoTeleport: Cycle complete. Restarting cycle.")
-        end
-
-        if autoTeleportActive and scriptRunning then
-            appendLog("AutoTeleport: Delaying " .. timers.teleport_delay_between_points .. " seconds before next teleport.")
-            waitSeconds(timers.teleport_delay_between_points)
+            else
+                 appendLog("SpecialSequence: No saved CFrame, attempting direct teleport to Staging Area.")
+                 teleportPlayer(teleportLocations[southPoleStagingLocationName], southPoleStagingLocationName .. " (Fallback Return No CFrame)")
+            end
+            timeSinceLastDrink = 0 
         end
     end
-    if scriptRunning then
-        updateStatus("AUTO_TELEPORT_STOPPED")
-        appendLog("AutoTeleport: Sequence halted.")
+
+    if not autoTeleportActive or not scriptRunning then
+        updateStatus("SEQUENCE_STOPPED_STAGING")
+        appendLog("SpecialSequence: Halted during staging wait.")
+        return
     end
+
+    -- 3. Teleport ke South Pole Checkpoint
+    appendLog("SpecialSequence: Staging wait complete. Teleporting to " .. southPoleCheckpointLocationName)
+    updateStatus("Teleporting to: " .. southPoleCheckpointLocationName)
+    if teleportPlayer(teleportLocations[southPoleCheckpointLocationName], southPoleCheckpointLocationName) then
+        updateStatus("ARRIVED_SOUTH_POLE_CP")
+        appendLog("SpecialSequence: Successfully arrived at " .. southPoleCheckpointLocationName .. ". Sequence complete.")
+    else
+        updateStatus("FAILED_SOUTH_POLE_CP_TELEPORT")
+        appendLog("SpecialSequence: Failed to teleport to " .. southPoleCheckpointLocationName)
+    end
+    
+    autoTeleportActive = false 
+    StartAutoTeleportButton.Text = "START SOUTH POLE SEQUENCE"
+    StartAutoTeleportButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+    StartAutoTeleportButton.TextColor3 = Color3.fromRGB(220,220,220)
+    updateStatus("SEQUENCE_COMPLETE")
 end
 
 
@@ -683,20 +675,20 @@ StartAutoTeleportButton.MouseButton1Click:Connect(function()
     if not scriptRunning then return end
     autoTeleportActive = not autoTeleportActive
     if autoTeleportActive then
-        StartAutoTeleportButton.Text = "STOP AUTO TELEPORT"
+        StartAutoTeleportButton.Text = "STOP SEQUENCE"
         StartAutoTeleportButton.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
         StartAutoTeleportButton.TextColor3 = Color3.fromRGB(255,255,255)
-        updateStatus("AUTO_TELEPORT_ACTIVE")
-        appendLog("Auto teleport sequence started.")
+        updateStatus("SOUTH_POLE_SEQUENCE_ACTIVE")
+        appendLog("South Pole sequence started.")
         if not autoTeleportThread or coroutine.status(autoTeleportThread) == "dead" then
-            autoTeleportThread = task.spawn(autoTeleportCycle)
+            autoTeleportThread = task.spawn(specialSouthPoleTeleportCycle) -- Memanggil fungsi baru
         end
     else
-        StartAutoTeleportButton.Text = "START AUTO TELEPORT"
+        StartAutoTeleportButton.Text = "START SOUTH POLE SEQUENCE"
         StartAutoTeleportButton.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
         StartAutoTeleportButton.TextColor3 = Color3.fromRGB(220,220,220)
         updateStatus("HALT_REQUESTED")
-        appendLog("Auto teleport sequence halt requested.")
+        appendLog("South Pole sequence halt requested.")
     end
 end)
 
@@ -713,10 +705,9 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
         return success
     end
     local allTimersValid = true
-    -- No longer applying teleport_wait_time from UI
     allTimersValid = applyTextInput(timerInputElements.teleportDelayBetweenPointsInput, "teleport_delay_between_points", timerInputElements.TeleportDelayBetweenPointsLabel) and allTimersValid
     allTimersValid = applyTextInput(timerInputElements.waterRefillDurationInput, "water_refill_duration", timerInputElements.WaterRefillDurationLabel) and allTimersValid
-    allTimersValid = applyTextInput(timerInputElements.waterDrinkIntervalInput, "water_drink_interval", timerInputElements.WaterDrinkIntervalLabel) and allTimersValid
+    -- WaterDrinkInterval input is removed from UI, so no longer applying it here
     allTimersValid = applyTextInput(timerInputElements.waterDrinkCountInput, "water_drink_count", timerInputElements.WaterDrinkCountLabel) and allTimersValid
 
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
@@ -724,10 +715,9 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     appendLog("Attempted to apply settings. Valid: " .. tostring(allTimersValid))
     task.delay(2, function()
         if not scriptRunning then return end
-        -- if timerInputElements.TeleportWaitTimeLabel then pcall(function() timerInputElements.TeleportWaitTimeLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end -- Removed
         if timerInputElements.TeleportDelayBetweenPointsLabel then pcall(function() timerInputElements.TeleportDelayBetweenPointsLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
         if timerInputElements.WaterRefillDurationLabel then pcall(function() timerInputElements.WaterRefillDurationLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
-        if timerInputElements.WaterDrinkIntervalLabel then pcall(function() timerInputElements.WaterDrinkIntervalLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+        -- WaterDrinkIntervalLabel is removed
         if timerInputElements.WaterDrinkCountLabel then pcall(function() timerInputElements.WaterDrinkCountLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
         updateStatus(originalStatus)
     end)
@@ -741,20 +731,16 @@ task.spawn(function()
     end
 end)
 
--- // Water Drink Timer Loop (Minum Otomatis) //
+-- // Global Water Drink Timer Loop (Dihapus karena logika minum terintegrasi ke siklus khusus) //
+--[[
 task.spawn(function()
     while scriptRunning do
         waitSeconds(1)
         if not scriptRunning then break end
-        waterDrinkTimer = waterDrinkTimer + 1
-        if waterDrinkTimer >= timers.water_drink_interval then
-            waterDrinkCounter = waterDrinkCounter + 1
-            appendLog("Time to drink water! (" .. waterDrinkCounter .. "/" .. timers.water_drink_count .. " times)")
-            drinkWater()
-            waterDrinkTimer = 0
-        end
+        -- Logika minum global dipindahkan/dihapus
     end
 end)
+--]]
 
 -- --- ANIMASI UI (Sama seperti sebelumnya, tidak ada perubahan di sini) ---
 task.spawn(function() 
@@ -926,6 +912,6 @@ game:BindToClose(function()
 end)
 
 -- Inisialisasi
-appendLog("Skrip Teleportasi Ekspedisi Antartika Telah Dimuat. V6.1 (Wait Times Adjusted).")
+appendLog("Skrip Teleportasi KHUSUS Basecamp ke South Pole Dimuat. V7.0 (Specific Sequence).")
 task.wait(1)
 if StatusLabel and StatusLabel.Parent and StatusLabel.Text == "" then StatusLabel.Text = "STATUS: STANDBY" end
