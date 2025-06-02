@@ -1,5 +1,6 @@
 -- MainScript.lua - Gabungan UI dan Logika Teleportasi Otomatis
 -- Dibuat berdasarkan referensi mainv2.lua dan script Roblox via executor
+-- Disesuaikan untuk game "Ekspedisi Antartika"
 
 -- // UI FRAME (Struktur Asli Dipertahankan) //
 local ScreenGui = Instance.new("ScreenGui")
@@ -35,7 +36,7 @@ local scriptRunning = false
 local mainCycleThread = nil -- Thread utama untuk siklus teleportasi
 
 local isMinimized = false
-local originalFrameSize = UDim2.new(0, 260, 0, 420) -- Ukuran awal UI lebih kecil
+local originalFrameSize = UDim2.new(0, 260, 0, 250) -- Ukuran UI disesuaikan karena timer input berkurang
 local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
 local minimizedZLabel = Instance.new("TextLabel") -- Label khusus untuk pop-up 'Z'
 
@@ -48,71 +49,48 @@ local timers = {
     genericShortDelay = 0.5,
 }
 
--- --- Konfigurasi Teleportasi ---
--- Menggunakan tabel untuk menyimpan data teleportasi agar lebih terstruktur dan mudah diatur
+-- --- Konfigurasi Teleportasi untuk "Ekspedisi Antartika" ---
+-- PENTING: Path dan CFrame ini adalah CONTOH. Anda mungkin perlu
+-- menggunakan alat seperti Dex Explorer di game untuk menemukan
+-- path dan koordinat CFrame yang akurat dari lokasi di "Ekspedisi Antartika".
 local teleportSequence = {
-    -- Camp 1
     {
-        name = "Camp 1 Main Tent",
-        path = "Camp_Main_Tents%.Camp1", -- Path dengan wildcard
-        childIndex = 11, -- Index anak jika diperlukan (untuk GetChildren()[index])
-        cframe = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381),
+        name = "Base Camp",
+        path = "Workspace.Antarctica.BaseCamp.SpawnLocation", -- Contoh path
+        cframe = CFrame.new(0, 100, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1), -- Contoh CFrame
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Camp 1 Checkpoint",
-        path = "Checkpoints%.Camp 1.SpawnLocation",
-        cframe = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-        waitAfter = 300 -- 5 menit
-    },
-    -- Camp 2
-    {
-        name = "Camp 2 Main Tent",
-        path = "Camp_Main_Tents%.Camp2",
-        childIndex = 11,
-        cframe = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277),
+        name = "Ice Cave Entrance",
+        path = "Workspace.Antarctica.IceCave.Entrance", -- Contoh path
+        cframe = CFrame.new(1000, 50, 500, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Camp 2 Checkpoint",
-        path = "Checkpoints%.Camp 2.SpawnLocation",
-        cframe = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-        waitAfter = 300 -- 5 menit
-    },
-    -- Camp 3
-    {
-        name = "Camp 3 Main Tent",
-        path = "Camp_Main_Tents%.Camp3",
-        childIndex = 13,
-        cframe = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121),
+        name = "Research Outpost",
+        path = "Workspace.Structures.ResearchOutpost.MainBuilding", -- Contoh path
+        cframe = CFrame.new(2500, 200, 1000, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Camp 3 Checkpoint",
-        path = "Checkpoints%.Camp 3.SpawnLocation",
-        cframe = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-        waitAfter = 300 -- 5 menit
-    },
-    -- Camp 4
-    {
-        name = "Camp 4 Floor",
-        path = "Camp_Main_Tents%.Camp4.Floor",
-        cframe = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052),
+        name = "Glacier Peak Summit",
+        path = "Workspace.Mountains.GlacierPeak.Summit", -- Contoh path
+        cframe = CFrame.new(4000, 500, 1500, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         waitAfter = 300 -- 5 menit
     },
     {
-        name = "Camp 4 Checkpoint",
-        path = "Checkpoints%.Camp 4.SpawnLocation",
-        cframe = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+        name = "Penguin Colony",
+        path = "Workspace.Wildlife.PenguinColony.Center", -- Contoh path
+        cframe = CFrame.new(5000, 50, 2000, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         waitAfter = 300 -- 5 menit
     },
-    -- South Pole
     {
-        name = "South Pole Checkpoint",
-        path = "Checkpoints%.South Pole.SpawnLocation",
-        cframe = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05),
+        name = "Ancient Ruin",
+        path = "Workspace.Ruins.AncientRuin.Entrance", -- Contoh path
+        cframe = CFrame.new(6500, 75, 2500, 1, 0, 0, 0, 1, 0, 0, 0, 1),
         waitAfter = 300 -- 5 menit
     },
+    -- Anda bisa menambahkan lebih banyak lokasi di sini sesuai kebutuhan game
 }
 
 
@@ -422,21 +400,35 @@ local function findObject(baseObject, path)
 end
 
 -- // Fungsi Teleportasi //
-local function teleportPlayer(targetCFrame)
+-- targetInstance bisa berupa BasePart atau Model. targetCFrameFallback digunakan jika targetInstance tidak valid.
+local function teleportPlayer(targetInstance, targetCFrameFallback)
     local character = LocalPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local hrp = character.HumanoidRootPart
-        -- Pastikan HumanoidRootPart tidak di-anchored atau di-locked
-        hrp.Anchored = false
-        hrp.CanCollide = false -- Agar tidak tersangkut
-        hrp.CFrame = targetCFrame
-        task.wait(timers.genericShortDelay) -- Beri sedikit waktu untuk fisika
-        hrp.CanCollide = true
-        return true
-    else
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
         warn("HumanoidRootPart tidak ditemukan atau karakter tidak ada.")
         return false
     end
+    local hrp = character.HumanoidRootPart
+
+    -- Pastikan HumanoidRootPart tidak di-anchored atau di-locked
+    hrp.Anchored = false
+    hrp.CanCollide = false -- Agar tidak tersangkut
+
+    local actualCFrame = targetCFrameFallback -- Default ke CFrame fallback
+
+    if targetInstance then
+        if targetInstance:IsA("BasePart") then
+            actualCFrame = targetInstance.CFrame
+        elseif targetInstance:IsA("Model") and targetInstance.PrimaryPart then
+            actualCFrame = targetInstance.PrimaryPart.CFrame
+        else
+            warn("Target instance ditemukan tetapi bukan BasePart atau Model dengan PrimaryPart: " .. targetInstance.Name .. ". Menggunakan CFrame fallback.")
+        end
+    end
+
+    hrp.CFrame = actualCFrame
+    task.wait(timers.genericShortDelay) -- Beri sedikit waktu untuk fisika
+    hrp.CanCollide = true
+    return true
 end
 
 -- // Fungsi utama siklus teleportasi //
@@ -444,47 +436,45 @@ local function runTeleportCycle()
     for i, step in ipairs(teleportSequence) do
         if not scriptRunning then break end
 
-        updateStatus("TELEPORTING TO: " .. step.name)
-        print("Attempting to teleport to: " .. step.name)
+        updateStatus("TELEPORTING KE: " .. step.name)
+        print("Mencoba teleportasi ke: " .. step.name)
 
-        local targetPart = nil
+        local targetInstance = nil
         if step.path then
             -- Coba cari objek dengan fungsi findObject
-            targetPart = findObject(game.Workspace, step.path)
-            if targetPart then
-                print("Found target part via path: " .. targetPart.Name)
-                -- Jika ada childIndex, coba ambil child spesifik
-                if step.childIndex and #targetPart:GetChildren() >= step.childIndex then
-                    targetPart = targetPart:GetChildren()[step.childIndex]
-                    print("Found target part via child index: " .. targetPart.Name)
+            targetInstance = findObject(game.Workspace, step.path)
+            if targetInstance then
+                print("Objek target ditemukan melalui path: " .. targetInstance.Name)
+                -- Jika ada childIndex, coba ambil child spesifik (hanya berlaku jika targetInstance adalah Model)
+                if step.childIndex and targetInstance:IsA("Model") and #targetInstance:GetChildren() >= step.childIndex then
+                    local specificChild = targetInstance:GetChildren()[step.childIndex]
+                    if specificChild:IsA("BasePart") or specificChild:IsA("Model") then
+                        targetInstance = specificChild -- Gunakan child spesifik jika itu BasePart atau Model
+                        print("Objek target spesifik ditemukan melalui indeks anak: " .. targetInstance.Name)
+                    else
+                        warn("Anak pada indeks " .. step.childIndex .. " bukan BasePart atau Model. Menggunakan CFrame dari induk.")
+                    end
                 end
             else
-                warn("Could not find target part via path: " .. step.path)
+                warn("Tidak dapat menemukan objek target melalui path: " .. step.path .. ". Menggunakan CFrame fallback.")
             end
         end
 
-        local success = false
-        if targetPart then
-            -- Jika objek ditemukan, gunakan CFrame objek tersebut
-            success = teleportPlayer(targetPart.CFrame)
-        else
-            -- Jika objek tidak ditemukan, gunakan CFrame yang sudah ditentukan di tabel
-            success = teleportPlayer(step.cframe)
-        end
+        local success = teleportPlayer(targetInstance, step.cframe) -- Lewati targetInstance dan CFrame fallback
 
         if not success then
-            updateStatus("TELEPORT FAILED: " .. step.name)
-            warn("Teleportation failed for: " .. step.name)
+            updateStatus("TELEPORT GAGAL: " .. step.name)
+            warn("Teleportasi gagal untuk: " .. step.name)
             scriptRunning = false -- Hentikan skrip jika teleportasi gagal
             break
         end
 
-        updateStatus("ARRIVED AT: " .. step.name)
+        updateStatus("TIBA DI: " .. step.name)
         waitSeconds(step.waitAfter or timers.wait_after_teleport) -- Gunakan waitAfter spesifik atau default
     end
 
     if scriptRunning then
-        updateStatus("CYCLE COMPLETE. RESTARTING...")
+        updateStatus("SIKLUS SELESAI. MEMULAI ULANG...")
         task.wait(timers.genericShortDelay)
     end
 end
@@ -502,7 +492,7 @@ StartButton.MouseButton1Click:Connect(function()
                 while scriptRunning do
                     runTeleportCycle()
                     if not scriptRunning then break end
-                    updateStatus("CYCLE_REINIT")
+                    updateStatus("SIKLUS_REINIT")
                     task.wait(1)
                 end
                 updateStatus("SYSTEM_HALTED")
@@ -512,7 +502,7 @@ StartButton.MouseButton1Click:Connect(function()
             end)
         end
     else
-        updateStatus("HALT_REQUESTED")
+        updateStatus("PERMINTAAN_HENTI")
     end
 end)
 
@@ -530,7 +520,7 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     local allTimersValid = true
     allTimersValid = applyTextInput(timerInputElements.waitAfterTeleportInput, "wait_after_teleport", timerInputElements.WaitAfterTeleportLabel) and allTimersValid
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
-    if allTimersValid then updateStatus("TIMER_CONFIG_APPLIED") else updateStatus("ERR_TIMER_INPUT_INVALID") end
+    if allTimersValid then updateStatus("KONFIGURASI_TIMER_DITERAPKAN") else updateStatus("ERR_INPUT_TIMER_TIDAK_VALID") end
     task.wait(2)
     if timerInputElements.WaitAfterTeleportLabel then pcall(function() timerInputElements.WaitAfterTeleportLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     updateStatus(originalStatus)
