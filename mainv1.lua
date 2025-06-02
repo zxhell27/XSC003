@@ -1,4 +1,3 @@
-
 -- // Services //
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -79,6 +78,9 @@ local timers = {
     teleport_delay_between_points = 5, -- Delay antar teleportasi dalam rute auto
     log_clear_interval = 60, -- Interval untuk membersihkan log (detik)
     teleport_y_offset = 5, -- Offset Y untuk mencegah clipping saat teleportasi
+    water_refill_duration = 5, -- Durasi pengisian air dalam detik
+    water_drink_interval = 300, -- Interval minum air dalam detik (5 menit)
+    water_drink_count = 5, -- Berapa kali player harus minum setiap interval
 }
 
 -- --- Definisi Titik Teleportasi (Ekspedisi Antartika) ---
@@ -89,18 +91,28 @@ local teleportLocations = {
     -- Camp 1
     ["Camp 1 Main Tent"] = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381),
     ["Camp 1 Checkpoint"] = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+    ["WaterRefill_Camp1"] = CFrame.new(-3690, 225, 280), -- Contoh posisi WaterRefill Camp 1
     -- Camp 2
     ["Camp 2 Main Tent"] = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277),
     ["Camp 2 Checkpoint"] = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+    ["WaterRefill_Camp2"] = CFrame.new(1770, 102, -185), -- Contoh posisi WaterRefill Camp 2
     -- Camp 3
     ["Camp 3 Main Tent"] = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121),
     ["Camp 3 Checkpoint"] = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+    ["WaterRefill_Camp3"] = CFrame.new(5850, 325, -5), -- Contoh posisi WaterRefill Camp 3
     -- Camp 4
     ["Camp 4 Main Tent"] = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052),
     ["Camp 4 Checkpoint"] = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0),
+    ["WaterRefill_Camp4"] = CFrame.new(8995, 593, 65), -- Contoh posisi WaterRefill Camp 4
     -- South Pole
     ["South Pole Checkpoint"] = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05),
 }
+
+-- Variabel untuk melacak status pengisian air
+local hasRefilledWaterAtCurrentCamp = false
+local lastRefillCamp = nil
+local waterDrinkTimer = 0
+local waterDrinkCounter = 0
 
 -- // Parent UI ke player //
 local function setupCoreGuiParenting()
@@ -252,7 +264,14 @@ local currentYConfig = 30
 timerInputElements.teleportWaitTimeInput = createTimerInput("TeleportWaitTime", currentYConfig, "Wait Time (Auto)", timers.teleport_wait_time)
 currentYConfig = currentYConfig + 25
 timerInputElements.teleportDelayBetweenPointsInput = createTimerInput("TeleportDelayBetweenPoints", currentYConfig, "Delay Between Points", timers.teleport_delay_between_points)
+currentYConfig = currentYConfig + 25
+timerInputElements.waterRefillDurationInput = createTimerInput("WaterRefillDuration", currentYConfig, "Water Refill Duration", timers.water_refill_duration)
+currentYConfig = currentYConfig + 25
+timerInputElements.waterDrinkIntervalInput = createTimerInput("WaterDrinkInterval", currentYConfig, "Water Drink Interval", timers.water_drink_interval)
+currentYConfig = currentYConfig + 25
+timerInputElements.waterDrinkCountInput = createTimerInput("WaterDrinkCount", currentYConfig, "Water Drink Count", timers.water_drink_count)
 currentYConfig = currentYConfig + 35
+
 
 ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30)
 ApplyTimersButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers)
@@ -426,6 +445,9 @@ elementsToToggleVisibility = {
     UiTitleLabel, StartAutoTeleportButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
     timerInputElements.teleportWaitTimeLabel, timerInputElements.teleportWaitTimeInput,
     timerInputElements.teleportDelayBetweenPointsLabel, timerInputElements.teleportDelayBetweenPointsInput,
+    timerInputElements.WaterRefillDurationLabel, timerInputElements.WaterRefillDurationInput,
+    timerInputElements.WaterDrinkIntervalLabel, timerInputElements.WaterDrinkIntervalInput,
+    timerInputElements.WaterDrinkCountLabel, timerInputElements.WaterDrinkCountInput,
     ManualTeleportFrame, LogFrame, MinimizeButton -- Include MinimizeButton here to hide it during 'Z' mode
 }
 
@@ -560,6 +582,66 @@ local function teleportPlayer(cframeTarget, locationName)
     return true
 end
 
+-- Fungsi untuk mengisi air
+local function refillWater(campName)
+    if not LocalPlayer or not LocalPlayer.Character then return end
+
+    -- Cek apakah sudah mengisi air di camp ini sebelumnya
+    if lastRefillCamp == campName and hasRefilledWaterAtCurrentCamp then
+        appendLog("Water already refilled at " .. campName .. ". Skipping.")
+        return
+    end
+
+    local waterRefillLocationName = "WaterRefill_" .. campName:match("Camp (%d)") -- Extract camp number
+    if waterRefillLocationName then
+        local refillCFrame = teleportLocations[waterRefillLocationName]
+        if refillCFrame then
+            appendLog("Teleporting to water refill point at " .. campName .. "...")
+            if teleportPlayer(refillCFrame, "Water Refill " .. campName) then
+                updateStatus("Refilling water at " .. campName .. "...")
+                appendLog("Refilling water for " .. timers.water_refill_duration .. " seconds.")
+                waitSeconds(timers.water_refill_duration) -- Tunggu selama durasi pengisian air
+                appendLog("Water refill complete at " .. campName .. ".")
+                hasRefilledWaterAtCurrentCamp = true
+                lastRefillCamp = campName
+                -- Teleport kembali ke lokasi sebelumnya jika diperlukan, atau biarkan di titik refill
+                -- Untuk saat ini, asumsikan player akan bergerak sendiri setelah refill
+            else
+                appendLog("Failed to teleport to water refill point at " .. campName .. ".")
+            end
+        else
+            appendLog("Water refill location not defined for " .. campName .. ".")
+        end
+    else
+        appendLog("Could not determine water refill location for current camp.")
+    end
+end
+
+-- Fungsi untuk minum air
+local function drinkWater()
+    if LocalPlayer and LocalPlayer.Character then
+        local waterBottle = LocalPlayer.Character:FindFirstChild("Water Bottle")
+        if waterBottle then
+            local remoteEvent = waterBottle:FindFirstChild("RemoteEvent")
+            if remoteEvent then
+                for i = 1, timers.water_drink_count do
+                    remoteEvent:FireServer()
+                    appendLog("Drinking water (" .. i .. "/" .. timers.water_drink_count .. ")")
+                    task.wait(0.5) -- Delay singkat antar minum
+                end
+                appendLog("Finished drinking water.")
+                waterDrinkCounter = 0 -- Reset counter setelah minum
+            else
+                appendLog("RemoteEvent not found in Water Bottle.")
+            end
+        else
+            appendLog("Water Bottle not found in character.")
+        end
+    else
+        appendLog("Player character not found for drinking water.")
+    end
+end
+
 -- // Fungsi Auto Teleport //
 local function autoTeleportCycle()
     local locations = {
@@ -575,6 +657,14 @@ local function autoTeleportCycle()
         local locationName = locations[currentPointIndex]
         local cframeTarget = teleportLocations[locationName]
 
+        -- Reset status pengisian air saat berpindah camp utama
+        if locationName:find("Camp") and not locationName:find("Checkpoint") then
+            local currentCampNumber = locationName:match("Camp (%d)")
+            if lastRefillCamp ~= "Camp " .. currentCampNumber then
+                hasRefilledWaterAtCurrentCamp = false
+            end
+        end
+
         if cframeTarget then
             updateStatus("Auto-teleporting to: " .. locationName)
             appendLog("Starting auto-teleport to: " .. locationName)
@@ -583,6 +673,14 @@ local function autoTeleportCycle()
                 appendLog("Auto-teleport failed for " .. locationName .. ". Retrying in 5 seconds...")
                 task.wait(5) -- Tunggu sebentar sebelum mencoba lagi atau melanjutkan
                 -- Anda bisa menambahkan logika retry di sini jika diperlukan
+            end
+
+            -- Jika ini adalah lokasi camp utama (bukan checkpoint), coba isi air
+            if locationName:find("Camp") and not locationName:find("Checkpoint") then
+                local campNumber = locationName:match("Camp (%d)")
+                if campNumber then
+                    refillWater("Camp " .. campNumber)
+                end
             end
 
             appendLog("Waiting for " .. timers.teleport_wait_time .. " seconds at " .. locationName)
@@ -650,6 +748,9 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     local allTimersValid = true
     allTimersValid = applyTextInput(timerInputElements.teleportWaitTimeInput, "teleport_wait_time", timerInputElements.TeleportWaitTimeLabel) and allTimersValid
     allTimersValid = applyTextInput(timerInputElements.teleportDelayBetweenPointsInput, "teleport_delay_between_points", timerInputElements.TeleportDelayBetweenPointsLabel) and allTimersValid
+    allTimersValid = applyTextInput(timerInputElements.waterRefillDurationInput, "water_refill_duration", timerInputElements.WaterRefillDurationLabel) and allTimersValid
+    allTimersValid = applyTextInput(timerInputElements.waterDrinkIntervalInput, "water_drink_interval", timerInputElements.WaterDrinkIntervalLabel) and allTimersValid
+    allTimersValid = applyTextInput(timerInputElements.waterDrinkCountInput, "water_drink_count", timerInputElements.WaterDrinkCountLabel) and allTimersValid
 
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
     if allTimersValid then updateStatus("SETTINGS_APPLIED") else updateStatus("ERR_INVALID_INPUT") end
@@ -657,6 +758,9 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     task.wait(2)
     if timerInputElements.TeleportWaitTimeLabel then pcall(function() timerInputElements.TeleportWaitTimeLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     if timerInputElements.TeleportDelayBetweenPointsLabel then pcall(function() timerInputElements.TeleportDelayBetweenPointsLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    if timerInputElements.WaterRefillDurationLabel then pcall(function() timerInputElements.WaterRefillDurationLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    if timerInputElements.WaterDrinkIntervalLabel then pcall(function() timerInputElements.WaterDrinkIntervalLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    if timerInputElements.WaterDrinkCountLabel then pcall(function() timerInputElements.WaterDrinkCountLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
     updateStatus(originalStatus)
 end)
 
@@ -664,17 +768,19 @@ end)
 local function populateDropdownOptions()
     -- Clear existing options
     for _, child in ipairs(TeleportDropdownOptionsFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
+        if child:IsA("TextButton") or child:IsA("UIListLayout") then -- Keep UIListLayout
+            if child.Name ~= "UIListLayout" then
+                child:Destroy()
+            end
         end
     end
 
     -- Define the order of locations for the dropdown
     local orderedLocations = {
-        "Camp 1 Main Tent", "Camp 1 Checkpoint",
-        "Camp 2 Main Tent", "Camp 2 Checkpoint",
-        "Camp 3 Main Tent", "Camp 3 Checkpoint",
-        "Camp 4 Main Tent", "Camp 4 Checkpoint",
+        "Camp 1 Main Tent", "Camp 1 Checkpoint", "WaterRefill_Camp1",
+        "Camp 2 Main Tent", "Camp 2 Checkpoint", "WaterRefill_Camp2",
+        "Camp 3 Main Tent", "Camp 3 Checkpoint", "WaterRefill_Camp3",
+        "Camp 4 Main Tent", "Camp 4 Checkpoint", "WaterRefill_Camp4",
         "South Pole Checkpoint"
     }
 
@@ -712,8 +818,8 @@ local function populateDropdownOptions()
         end
     end
     -- Adjust the height of the dropdown options frame based on content
-    TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0, 0, 0, #orderedLocations * (optionHeight + UIListLayout.Padding.Offset))
-    TeleportDropdownOptionsFrame.Size = UDim2.new(1, 0, 0, math.min(150, TeleportDropdownOptionsFrame.CanvasSize.Y.Offset)) -- Adjusted width to fill parent
+    TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0, 0, 0, #TeleportDropdownOptionsFrame:GetChildren() * (optionHeight + UIListLayout.Padding.Offset))
+    TeleportDropdownOptionsFrame.Size = UDim2.new(0, TeleportLocationSelector.Size.X.Offset, 0, math.min(150, TeleportDropdownOptionsFrame.CanvasSize.Y.Offset)) -- Adjusted width to match selector
 end
 
 TeleportLocationSelector.MouseButton1Click:Connect(function()
@@ -766,6 +872,13 @@ TeleportButton.MouseButton1Click:Connect(function()
     local cframe = teleportLocations[selectedLocation]
     if cframe then
         teleportPlayer(cframe, selectedLocation)
+        -- Jika lokasi yang dipilih adalah titik refill air, panggil fungsi refillWater
+        if selectedLocation:find("WaterRefill_Camp") then
+            local campNumber = selectedLocation:match("WaterRefill_Camp(%d)")
+            if campNumber then
+                refillWater("Camp " .. campNumber)
+            end
+        end
     else
         appendLog("Manual Teleport Error: Location '" .. selectedLocation .. "' not found or not selected.")
         updateStatus("MANUAL_TP_ERROR")
@@ -777,6 +890,20 @@ task.spawn(function()
     while true do
         task.wait(timers.log_clear_interval)
         clearLog()
+    end
+end)
+
+-- // Water Drink Timer Loop //
+task.spawn(function()
+    while true do
+        task.wait(1)
+        waterDrinkTimer = waterDrinkTimer + 1
+        if waterDrinkTimer >= timers.water_drink_interval then
+            waterDrinkCounter = waterDrinkCounter + 1
+            appendLog("Time to drink water! (" .. waterDrinkCounter .. "/" .. timers.water_drink_count .. " times left)")
+            drinkWater()
+            waterDrinkTimer = 0 -- Reset timer
+        end
     end
 end)
 
