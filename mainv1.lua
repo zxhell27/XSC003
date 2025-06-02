@@ -1,6 +1,7 @@
 -- MainScript.lua - Gabungan UI dan Logika Teleportasi Otomatis
 -- Dibuat berdasarkan referensi mainv2.lua dan script Roblox via executor
--- Disesuaikan untuk game "Ekspedisi Antartika" dengan perbaikan bug UI dan teleportasi
+-- Disesuaikan untuk game "Ekspedisi Antartika" dengan perbaikan bug UI, teleportasi,
+-- pengaturan timer detail, dan tombol teleport manual.
 
 -- // UI FRAME (Struktur Asli Dipertahankan) //
 local ScreenGui = Instance.new("ScreenGui")
@@ -22,29 +23,33 @@ StatusLabel.Name = "StatusLabel"
 local MinimizeButton = Instance.new("TextButton")
 MinimizeButton.Name = "MinimizeButton"
 
+-- ScrollingFrame untuk menampung pengaturan timer dan tombol teleport manual
+local ContentScrollFrame = Instance.new("ScrollingFrame")
+ContentScrollFrame.Name = "ContentScrollFrame"
+
 local TimerTitleLabel = Instance.new("TextLabel")
 TimerTitleLabel.Name = "TimerTitle"
 
 local ApplyTimersButton = Instance.new("TextButton")
 ApplyTimersButton.Name = "ApplyTimersButton"
 
--- Tabel untuk menyimpan referensi elemen input timer
+-- Tabel untuk menyimpan referensi elemen input timer dan tombol manual
 local timerInputElements = {}
+local manualTeleportButtons = {}
 
 -- --- Variabel Kontrol dan State ---
 local scriptRunning = false
 local mainCycleThread = nil -- Thread utama untuk siklus teleportasi
 
 local isMinimized = false
-local originalFrameSize = UDim2.new(0, 260, 0, 250) -- Ukuran UI disesuaikan karena timer input berkurang
+local originalFrameSize = UDim2.new(0, 260, 0, 550) -- Ukuran UI diperbesar untuk menampung konten
 local minimizedFrameSize = UDim2.new(0, 50, 0, 50) -- Ukuran pop-up 'Z'
 
 -- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton TIDAK termasuk di sini)
 local elementsToToggleVisibility = {} -- Akan diisi setelah semua elemen UI dibuat
 
--- --- Tabel Konfigurasi Timer ---
+-- --- Tabel Konfigurasi Timer Global ---
 local timers = {
-    wait_after_teleport = 300, -- Default 5 menit (300 detik)
     genericShortDelay = 0.5,
 }
 
@@ -127,9 +132,9 @@ local function setupCoreGuiParenting()
     StartButton.Parent = Frame
     StatusLabel.Parent = Frame
     MinimizeButton.Parent = Frame
-    TimerTitleLabel.Parent = Frame
-    ApplyTimersButton.Parent = Frame
-    -- minimizedZLabel dihapus karena MinimizeButton akan mengambil alih perannya
+    ContentScrollFrame.Parent = Frame -- Parentkan ScrollingFrame ke Frame utama
+    TimerTitleLabel.Parent = ContentScrollFrame -- Pindahkan ke ScrollingFrame
+    ApplyTimersButton.Parent = ContentScrollFrame -- Pindahkan ke ScrollingFrame
 end
 
 -- Panggil setupCoreGuiParenting di awal
@@ -201,11 +206,26 @@ local StatusLabelCorner = Instance.new("UICorner")
 StatusLabelCorner.CornerRadius = UDim.new(0, 5)
 StatusLabelCorner.Parent = StatusLabel
 
-local yOffsetForTimers = yOffsetForTitle + 100 -- Disesuaikan
+-- --- ScrollingFrame untuk Konten ---
+ContentScrollFrame.Size = UDim2.new(1, -40, 1, -(yOffsetForTitle + 45 + 10)) -- Sesuaikan ukuran agar pas di bawah StatusLabel
+ContentScrollFrame.Position = UDim2.new(0, 20, 0, yOffsetForTitle + 45 + 10)
+ContentScrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+ContentScrollFrame.BorderSizePixel = 1
+ContentScrollFrame.BorderColor3 = Color3.fromRGB(50, 50, 60)
+ContentScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Akan diatur secara dinamis
+ContentScrollFrame.ScrollBarThickness = 6
+ContentScrollFrame.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y -- Penting untuk scrolling otomatis
+ContentScrollFrame.ZIndex = 2
+
+local ContentScrollFrameCorner = Instance.new("UICorner")
+ContentScrollFrameCorner.CornerRadius = UDim.new(0, 5)
+ContentScrollFrameCorner.Parent = ContentScrollFrame
+
+local yOffsetForContentInScroll = 10 -- Jarak dari atas ScrollingFrame
 
 -- --- Konfigurasi Timer UI ---
-TimerTitleLabel.Size = UDim2.new(1, -40, 0, 20) -- Lebih kecil
-TimerTitleLabel.Position = UDim2.new(0, 20, 0, yOffsetForTimers)
+TimerTitleLabel.Size = UDim2.new(1, -20, 0, 20) -- Lebih kecil
+TimerTitleLabel.Position = UDim2.new(0, 10, 0, yOffsetForContentInScroll)
 TimerTitleLabel.Text = "// TIMER CONFIGURATION_SEQ"
 TimerTitleLabel.Font = Enum.Font.Code
 TimerTitleLabel.TextSize = 14 -- Ukuran font sedang
@@ -214,52 +234,58 @@ TimerTitleLabel.BackgroundTransparency = 1
 TimerTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TimerTitleLabel.ZIndex = 2
 
-local function createTimerInput(name, yPos, labelText, initialValue)
+local currentYConfig = yOffsetForContentInScroll + 25 -- Jarak dari TimerTitleLabel (disesuaikan)
+
+-- Fungsi untuk membuat input timer untuk setiap langkah teleportasi
+local function createTimerInputForStep(index, labelText, initialValue)
     local label = Instance.new("TextLabel")
-    label.Name = name .. "Label"
-    label.Parent = Frame
-    label.Size = UDim2.new(0.55, -25, 0, 20) -- Lebih kecil
-    label.Position = UDim2.new(0, 20, 0, yPos + yOffsetForTimers)
+    label.Name = "TimerLabel_" .. index
+    label.Parent = ContentScrollFrame
+    label.Size = UDim2.new(0.55, -15, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, currentYConfig)
     label.Text = labelText .. ":"
     label.Font = Enum.Font.SourceSans
-    label.TextSize = 12 -- Ukuran font sedang
+    label.TextSize = 12
     label.TextColor3 = Color3.fromRGB(180, 180, 200)
     label.BackgroundTransparency = 1
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.ZIndex = 2
-    timerInputElements[name .. "Label"] = label
+    timerInputElements["TimerLabel_" .. index] = label
 
     local input = Instance.new("TextBox")
-    input.Name = name .. "Input"
-    input.Parent = Frame
-    input.Size = UDim2.new(0.45, -25, 0, 20) -- Lebih kecil
-    input.Position = UDim2.new(0.55, 5, 0, yPos + yOffsetForTimers)
+    input.Name = "TimerInput_" .. index
+    input.Parent = ContentScrollFrame
+    input.Size = UDim2.new(0.45, -15, 0, 20)
+    input.Position = UDim2.new(0.55, 5, 0, currentYConfig)
     input.Text = tostring(initialValue)
     input.PlaceholderText = "sec"
     input.Font = Enum.Font.SourceSansSemibold
-    input.TextSize = 12 -- Ukuran font sedang
+    input.TextSize = 12
     input.TextColor3 = Color3.fromRGB(255, 255, 255)
     input.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     input.ClearTextOnFocus = false
     input.BorderColor3 = Color3.fromRGB(100, 100, 120)
     input.BorderSizePixel = 1
     input.ZIndex = 2
-    timerInputElements[name .. "Input"] = input
+    timerInputElements["TimerInput_" .. index] = input
 
     local InputCorner = Instance.new("UICorner")
     InputCorner.CornerRadius = UDim.new(0, 3)
     InputCorner.Parent = input
 
+    currentYConfig = currentYConfig + 25 -- Pindah ke baris berikutnya
     return input
 end
 
-local currentYConfig = 30 -- Jarak dari TimerTitleLabel (disesuaikan)
--- Inisialisasi nilai input timer dari tabel timers
-timerInputElements.waitAfterTeleportInput = createTimerInput("WaitAfterTeleport", currentYConfig, "WAIT_AFTER_TELEPORT", timers.wait_after_teleport)
-currentYConfig = currentYConfig + 25 -- Jarak antar input (disesuaikan)
+-- Buat input timer untuk setiap langkah teleportasi
+for i, step in ipairs(teleportSequence) do
+    createTimerInputForStep(i, "Wait After " .. step.name, step.waitAfter)
+end
 
-ApplyTimersButton.Size = UDim2.new(1, -40, 0, 30) -- Lebih kecil
-ApplyTimersButton.Position = UDim2.new(0, 20, 0, currentYConfig + yOffsetForTimers)
+currentYConfig = currentYConfig + 10 -- Sedikit spasi sebelum tombol Apply
+
+ApplyTimersButton.Size = UDim2.new(1, -20, 0, 30) -- Lebih kecil
+ApplyTimersButton.Position = UDim2.new(0, 10, 0, currentYConfig)
 ApplyTimersButton.Text = "APPLY_TIMERS"
 ApplyTimersButton.Font = Enum.Font.SourceSansBold
 ApplyTimersButton.TextSize = 14 -- Ukuran font sedang
@@ -268,10 +294,103 @@ ApplyTimersButton.BackgroundColor3 = Color3.fromRGB(30, 80, 30) -- Hijau gelap
 ApplyTimersButton.BorderColor3 = Color3.fromRGB(80, 255, 80)
 ApplyTimersButton.BorderSizePixel = 1
 ApplyTimersButton.ZIndex = 2
+ApplyTimersButton.Parent = ContentScrollFrame
 
 local ApplyButtonCorner = Instance.new("UICorner")
 ApplyButtonCorner.CornerRadius = UDim.new(0, 5)
 ApplyButtonCorner.Parent = ApplyTimersButton
+
+currentYConfig = currentYConfig + 40 -- Spasi sebelum tombol teleport manual
+
+-- --- Tombol Teleport Manual ---
+local ManualTeleportTitleLabel = Instance.new("TextLabel")
+ManualTeleportTitleLabel.Name = "ManualTeleportTitle"
+ManualTeleportTitleLabel.Parent = ContentScrollFrame
+ManualTeleportTitleLabel.Size = UDim2.new(1, -20, 0, 20)
+ManualTeleportTitleLabel.Position = UDim2.new(0, 10, 0, currentYConfig)
+ManualTeleportTitleLabel.Text = "// MANUAL TELEPORT"
+ManualTeleportTitleLabel.Font = Enum.Font.Code
+ManualTeleportTitleLabel.TextSize = 14
+ManualTeleportTitleLabel.TextColor3 = Color3.fromRGB(80, 255, 255) -- Biru terang
+ManualTeleportTitleLabel.BackgroundTransparency = 1
+ManualTeleportTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+ManualTeleportTitleLabel.ZIndex = 2
+
+currentYConfig = currentYConfig + 25 -- Jarak dari judul manual teleport
+
+-- Fungsi untuk membuat tombol teleport manual
+local function createManualTeleportButton(step, index)
+    local button = Instance.new("TextButton")
+    button.Name = "TeleportButton_" .. index
+    button.Parent = ContentScrollFrame
+    button.Size = UDim2.new(1, -20, 0, 30)
+    button.Position = UDim2.new(0, 10, 0, currentYConfig)
+    button.Text = "TELEPORT TO: " .. string.upper(step.name)
+    button.Font = Enum.Font.SourceSansBold
+    button.TextSize = 14
+    button.TextColor3 = Color3.fromRGB(220, 220, 220)
+    button.BackgroundColor3 = Color3.fromRGB(20, 50, 80) -- Biru gelap
+    button.BorderColor3 = Color3.fromRGB(80, 150, 255)
+    button.BorderSizePixel = 1
+    button.ZIndex = 2
+
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 5)
+    ButtonCorner.Parent = button
+
+    button.MouseButton1Click:Connect(function()
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            updateStatus("ERROR: KARAKTER TIDAK SIAP UNTUK TELEPORT.")
+            warn("Karakter atau HumanoidRootPart tidak ditemukan untuk teleport manual.")
+            return
+        end
+
+        updateStatus("TELEPORTING MANUAL KE: " .. step.name)
+        print("Mencoba teleportasi manual ke: " .. step.name)
+
+        local targetInstance = nil
+        if step.path then
+            local potentialParent = findObject(game.Workspace, step.path)
+            if potentialParent then
+                if step.childIndex then
+                    local children = potentialParent:GetChildren()
+                    if step.childIndex > 0 and step.childIndex <= #children then
+                        local specificChild = children[step.childIndex]
+                        if specificChild and (specificChild:IsA("BasePart") or (specificChild:IsA("Model") and specificChild.PrimaryPart)) then
+                            targetInstance = specificChild
+                        else
+                            warn("Anak pada indeks " .. step.childIndex .. " tidak valid (bukan BasePart/Model dengan PrimaryPart). Menggunakan induk.")
+                            targetInstance = potentialParent
+                        end
+                    else
+                        warn("Indeks anak tidak valid atau di luar batas (" .. step.childIndex .. "). Menggunakan induk.")
+                        targetInstance = potentialParent
+                    end
+                else
+                    targetInstance = potentialParent
+                end
+            else
+                warn("Tidak dapat menemukan objek target melalui path: " .. step.path .. ". Menggunakan CFrame fallback yang ditentukan.")
+            end
+        end
+
+        local success = teleportPlayer(targetInstance, step.cframe)
+        if success then
+            updateStatus("TELEPORT MANUAL BERHASIL KE: " .. step.name)
+        else
+            updateStatus("TELEPORT MANUAL GAGAL KE: " .. step.name)
+        end
+    end)
+
+    manualTeleportButtons[index] = button
+    currentYConfig = currentYConfig + 35 -- Pindah ke baris berikutnya
+end
+
+-- Buat tombol teleport manual untuk setiap langkah
+for i, step in ipairs(teleportSequence) do
+    createManualTeleportButton(step, i)
+end
+
 
 -- --- Tombol Minimize ---
 local originalMinimizeButtonSize = UDim2.new(0, 25, 0, 25)
@@ -300,8 +419,7 @@ MinimizeButtonCorner.Parent = MinimizeButton
 
 -- Kumpulan elemen yang visibilitasnya akan di-toggle (MinimizeButton TIDAK termasuk di sini)
 elementsToToggleVisibility = {
-    UiTitleLabel, StartButton, StatusLabel, TimerTitleLabel, ApplyTimersButton,
-    timerInputElements.WaitAfterTeleportLabel, timerInputElements.WaitAfterTeleportInput,
+    UiTitleLabel, StartButton, StatusLabel, ContentScrollFrame,
 }
 
 -- // Fungsi Bantu UI //
@@ -496,7 +614,7 @@ local function runTeleportCycle()
         end
 
         updateStatus("TIBA DI: " .. step.name)
-        waitSeconds(step.waitAfter or timers.wait_after_teleport) -- Gunakan waitAfter spesifik atau default
+        waitSeconds(step.waitAfter or timers.genericShortDelay) -- Gunakan waitAfter spesifik atau default
     end
 
     if scriptRunning then
@@ -534,21 +652,29 @@ end)
 
 -- Tombol Apply Timers
 ApplyTimersButton.MouseButton1Click:Connect(function()
-    local function applyTextInput(inputElement, timerKey, labelElement)
-        local success = false; if not inputElement then return false end
-        local value = tonumber(inputElement.Text)
-        if value and value >= 0 then timers[timerKey] = value
-            if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(80,255,80) end) end; success = true
-        else if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(255,80,80) end) end
-        end
-        return success
-    end
     local allTimersValid = true
-    allTimersValid = applyTextInput(timerInputElements.waitAfterTeleportInput, "wait_after_teleport", timerInputElements.WaitAfterTeleportLabel) and allTimersValid
+    for i, step in ipairs(teleportSequence) do
+        local inputElement = timerInputElements["TimerInput_" .. i]
+        local labelElement = timerInputElements["TimerLabel_" .. i]
+        local value = tonumber(inputElement.Text)
+
+        if value and value >= 0 then
+            teleportSequence[i].waitAfter = value
+            if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(80,255,80) end) end
+        else
+            allTimersValid = false
+            if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(255,80,80) end) end
+        end
+    end
+
     local originalStatus = StatusLabel.Text:gsub("STATUS: ", "")
     if allTimersValid then updateStatus("KONFIGURASI_TIMER_DITERAPKAN") else updateStatus("ERR_INPUT_TIMER_TIDAK_VALID") end
     task.wait(2)
-    if timerInputElements.WaitAfterTeleportLabel then pcall(function() timerInputElements.WaitAfterTeleportLabel.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    -- Reset warna label setelah 2 detik
+    for i, step in ipairs(teleportSequence) do
+        local labelElement = timerInputElements["TimerLabel_" .. i]
+        if labelElement then pcall(function() labelElement.TextColor3 = Color3.fromRGB(180,180,200) end) end
+    end
     updateStatus(originalStatus)
 end)
 
@@ -674,15 +800,6 @@ task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     end
 end)
 
--- task.spawn(function() -- Animasi Pop-up 'Z' (RGB Pulse) - Dihapus karena MinimizeButton mengambil alih
---     while ScreenGui and ScreenGui.Parent do
---         if isMinimized and minimizedZLabel.Visible then
---             local hue = (tick() * 0.2) % 1 -- Animasi warna RGB
---             minimizedZLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
---         end
---         task.wait(0.05)
---     end
--- end)
 -- --- END ANIMASI UI ---
 
 -- BindToClose
