@@ -380,7 +380,18 @@ end
 local function teleportTo(targetPart)
     if not scriptRunning then return false end
     local player = game:GetService("Players").LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
+    local character = player.Character
+    if not character then
+        -- Tunggu hingga karakter dimuat jika belum ada
+        character = player.CharacterAdded:Wait()
+    end
+
+    if not character then
+        warn("Karakter tidak ditemukan setelah menunggu.")
+        updateStatus("ERR: NO_CHARACTER_FOR_TP")
+        return false
+    end
+
     local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
 
     if not humanoidRootPart then
@@ -391,9 +402,15 @@ local function teleportTo(targetPart)
 
     if targetPart and targetPart:IsA("BasePart") then
         updateStatus("TELEPORTING TO: " .. targetPart.Name)
-        pcall(function()
+        local success, err = pcall(function()
+            -- Metode teleportasi umum: mengatur CFrame dari HumanoidRootPart
             humanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0) -- Tambah sedikit offset Y agar tidak terjebak
         end)
+        if not success then
+            warn("Gagal melakukan teleportasi: " .. err)
+            updateStatus("ERR: TP_FAILED")
+            return false
+        end
         waitSeconds(timers.teleportWait)
         return true
     else
@@ -534,6 +551,14 @@ local function updateQiLoop_enhanced()
     while scriptRunning do
         if not stopUpdateQi and not pauseUpdateQiTemporarily then fireRemoteEnhanced("UpdateQi", "Base", {}) end
         task.wait(timers.update_qi_interval)
+    end
+end
+
+-- Thread untuk minum air (dipisahkan agar berjalan secara paralel)
+local function waterDrinkLoop()
+    while scriptRunning do
+        drinkWater()
+        waitSeconds(timers.waterDrinkInterval)
     end
 end
 
