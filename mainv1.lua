@@ -44,8 +44,11 @@ ManualTeleportFrame.Name = "ManualTeleportFrame"
 local ManualTeleportTitle = Instance.new("TextLabel")
 ManualTeleportTitle.Name = "ManualTeleportTitle"
 
-local TeleportDropdown = Instance.new("TextBox") -- Akan berfungsi sebagai dropdown simulasi
-TeleportDropdown.Name = "TeleportDropdown"
+local TeleportDropdownDisplay = Instance.new("TextBox") -- Display for the selected location
+TeleportDropdownDisplay.Name = "TeleportDropdownDisplay"
+
+local TeleportDropdownOptionsFrame = Instance.new("ScrollingFrame") -- Frame for dropdown options
+TeleportDropdownOptionsFrame.Name = "TeleportDropdownOptionsFrame"
 
 local TeleportButton = Instance.new("TextButton")
 TeleportButton.Name = "TeleportButton"
@@ -61,7 +64,6 @@ LogOutput.Name = "LogOutput"
 
 -- Tabel untuk menyimpan referensi elemen input timer
 local timerInputElements = {}
-local manualTeleportPoints = {} -- Akan diisi dengan tujuan teleportasi
 
 -- --- Variabel Kontrol dan State ---
 local scriptRunning = false
@@ -80,6 +82,7 @@ local timers = {
     teleport_wait_time = 300, -- Default 5 menit (300 detik)
     teleport_delay_between_points = 5, -- Delay antar teleportasi dalam rute auto
     log_clear_interval = 60, -- Interval untuk membersihkan log (detik)
+    teleport_y_offset = 5, -- Offset Y untuk mencegah clipping saat teleportasi
 }
 
 -- --- Definisi Titik Teleportasi (Ekspedisi Antartika) ---
@@ -122,7 +125,8 @@ local function setupCoreGuiParenting()
     minimizedZLabel.Parent = Frame -- Parentkan label Z ke Frame
     ManualTeleportFrame.Parent = Frame
     ManualTeleportTitle.Parent = ManualTeleportFrame
-    TeleportDropdown.Parent = ManualTeleportFrame
+    TeleportDropdownDisplay.Parent = ManualTeleportFrame
+    TeleportDropdownOptionsFrame.Parent = ManualTeleportFrame
     TeleportButton.Parent = ManualTeleportFrame
     LogFrame.Parent = Frame
     LogTitle.Parent = LogFrame
@@ -278,6 +282,7 @@ ManualTeleportFrame.Position = UDim2.new(0, 20, 0, yOffsetForManualTeleport)
 ManualTeleportFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 ManualTeleportFrame.BorderSizePixel = 1
 ManualTeleportFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
+ManualTeleportFrame.ClipsDescendants = true -- Penting untuk dropdown
 ManualTeleportFrame.ZIndex = 2
 
 local ManualFrameCorner = Instance.new("UICorner")
@@ -294,25 +299,48 @@ ManualTeleportTitle.BackgroundTransparency = 1
 ManualTeleportTitle.TextXAlignment = Enum.TextXAlignment.Left
 ManualTeleportTitle.ZIndex = 2
 
-TeleportDropdown.Size = UDim2.new(1, -20, 0, 30)
-TeleportDropdown.Position = UDim2.new(0, 10, 0, 40)
-TeleportDropdown.Text = "Select Location..."
-TeleportDropdown.PlaceholderText = "Type or select location"
-TeleportDropdown.Font = Enum.Font.SourceSansSemibold
-TeleportDropdown.TextSize = 14
-TeleportDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeleportDropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-TeleportDropdown.ClearTextOnFocus = false
-TeleportDropdown.BorderColor3 = Color3.fromRGB(100, 100, 120)
-TeleportDropdown.BorderSizePixel = 1
-TeleportDropdown.ZIndex = 2
+TeleportDropdownDisplay.Size = UDim2.new(1, -20, 0, 30)
+TeleportDropdownDisplay.Position = UDim2.new(0, 10, 0, 40)
+TeleportDropdownDisplay.Text = "Select Location..."
+TeleportDropdownDisplay.PlaceholderText = "Click to select"
+TeleportDropdownDisplay.Font = Enum.Font.SourceSansSemibold
+TeleportDropdownDisplay.TextSize = 14
+TeleportDropdownDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportDropdownDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+TeleportDropdownDisplay.ClearTextOnFocus = false
+TeleportDropdownDisplay.BorderColor3 = Color3.fromRGB(100, 100, 120)
+TeleportDropdownDisplay.BorderSizePixel = 1
+TeleportDropdownDisplay.ZIndex = 2
+TeleportDropdownDisplay.TextEditable = false -- Make it not directly editable by typing
 
-local DropdownCorner = Instance.new("UICorner")
-DropdownCorner.CornerRadius = UDim.new(0, 3)
-DropdownCorner.Parent = TeleportDropdown
+local DropdownDisplayCorner = Instance.new("UICorner")
+DropdownDisplayCorner.CornerRadius = UDim.new(0, 3)
+DropdownDisplayCorner.Parent = TeleportDropdownDisplay
+
+-- Dropdown Options Frame (ScrollingFrame)
+TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, 100) -- Height will expand
+TeleportDropdownOptionsFrame.Position = UDim2.new(0, 10, 0, 70) -- Position below the display
+TeleportDropdownOptionsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+TeleportDropdownOptionsFrame.BorderSizePixel = 1
+TeleportDropdownOptionsFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
+TeleportDropdownOptionsFrame.ZIndex = 3 -- Higher ZIndex to appear above other elements
+TeleportDropdownOptionsFrame.Visible = false -- Hidden by default
+TeleportDropdownOptionsFrame.ScrollBarThickness = 6
+TeleportDropdownOptionsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Automatically adjust canvas height
+
+local DropdownOptionsCorner = Instance.new("UICorner")
+DropdownOptionsCorner.CornerRadius = UDim.new(0, 3)
+DropdownOptionsCorner.Parent = TeleportDropdownOptionsFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = TeleportDropdownOptionsFrame
+UIListLayout.FillDirection = Enum.FillDirection.Vertical
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+UIListLayout.Padding = UDim.new(0, 2)
 
 TeleportButton.Size = UDim2.new(1, -20, 0, 30)
-TeleportButton.Position = UDim2.new(0, 10, 0, 80)
+TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Adjusted position for button
 TeleportButton.Text = "TELEPORT"
 TeleportButton.Font = Enum.Font.SourceSansBold
 TeleportButton.TextSize = 14
@@ -495,11 +523,33 @@ local function waitSeconds(sec)
     until not scriptRunning or tick() - startTime >= sec
 end
 
--- Fungsi Teleportasi dengan penanganan error
+-- Fungsi Teleportasi dengan penanganan error dan offset Y
 local function teleportPlayer(cframeTarget, locationName)
     local success, err = pcall(function()
         if LocalPlayer and LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then
-            LocalPlayer.Character.HumanoidRootPart.CFrame = cframeTarget
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Disable collisions briefly to prevent clipping
+                LocalPlayer.Character.Archivable = true
+                local originalCanCollide = {}
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        originalCanCollide[part] = part.CanCollide
+                        part.CanCollide = false
+                    end
+                end
+
+                -- Adjust CFrame with Y offset
+                LocalPlayer.Character.HumanoidRootPart.CFrame = cframeTarget + Vector3.new(0, timers.teleport_y_offset, 0)
+
+                -- Re-enable collisions
+                for part, canCollide in pairs(originalCanCollide) do
+                    if part and part.Parent then -- Check if part still exists
+                        part.CanCollide = canCollide
+                    end
+                end
+                LocalPlayer.Character.Archivable = false
+            end
             appendLog("Teleported to: " .. locationName)
             updateStatus("Teleported to: " .. locationName)
         else
@@ -614,58 +664,99 @@ ApplyTimersButton.MouseButton1Click:Connect(function()
     updateStatus(originalStatus)
 end)
 
--- // Manual Teleport Logic //
-local function populateDropdown()
-    local currentText = TeleportDropdown.Text
-    local matchingLocations = {}
-    for name, _ in pairs(teleportLocations) do
-        if string.find(string.lower(name), string.lower(currentText), 1, true) then
-            table.insert(matchingLocations, name)
+-- // Manual Teleport Logic (Dropdown) //
+local function populateDropdownOptions()
+    -- Clear existing options
+    for _, child in ipairs(TeleportDropdownOptionsFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
         end
     end
-    table.sort(matchingLocations) -- Urutkan secara alfabetis
 
-    -- Untuk simulasi dropdown, kita bisa menampilkan beberapa saran di log atau mengubah placeholder
-    if #matchingLocations > 0 then
-        local suggestions = "Suggestions: " .. table.concat(matchingLocations, ", ")
-        LogOutput.Text = suggestions .. "\n" .. LogOutput.Text -- Tambahkan di atas log
-    else
-        LogOutput.Text = "No matching locations. Try again.\n" .. LogOutput.Text
+    local sortedLocations = {}
+    for name, _ in pairs(teleportLocations) do
+        table.insert(sortedLocations, name)
     end
+    table.sort(sortedLocations)
+
+    local optionHeight = 25
+    for i, locationName in ipairs(sortedLocations) do
+        local optionButton = Instance.new("TextButton")
+        optionButton.Name = "Option_" .. i
+        optionButton.Parent = TeleportDropdownOptionsFrame
+        optionButton.Size = UDim2.new(1, 0, 0, optionHeight)
+        optionButton.Text = locationName
+        optionButton.Font = Enum.Font.SourceSans
+        optionButton.TextSize = 12
+        optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+        optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        optionButton.BorderSizePixel = 0
+        optionButton.TextXAlignment = Enum.TextXAlignment.Left
+        optionButton.TextWrapped = true
+
+        -- Hover effect
+        optionButton.MouseEnter:Connect(function()
+            optionButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+        end)
+        optionButton.MouseLeave:Connect(function()
+            optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        end)
+
+        optionButton.MouseButton1Click:Connect(function()
+            TeleportDropdownDisplay.Text = locationName
+            TeleportDropdownOptionsFrame.Visible = false
+            TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
+        end)
+    end
+    -- Adjust the height of the dropdown options frame based on content
+    TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, math.min(150, #sortedLocations * (optionHeight + UIListLayout.Padding.Offset)))
 end
 
-TeleportDropdown.Focused:Connect(function()
-    populateDropdown()
+TeleportDropdownDisplay.MouseButton1Click:Connect(function()
+    if TeleportDropdownOptionsFrame.Visible then
+        TeleportDropdownOptionsFrame.Visible = false
+        TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
+    else
+        populateDropdownOptions()
+        TeleportDropdownOptionsFrame.Visible = true
+        -- Move the Teleport button down to make space for the dropdown
+        TeleportButton.Position = UDim2.new(0, 10, 0, 80 + TeleportDropdownOptionsFrame.Size.Y.Offset + 5)
+    end
 end)
 
-TeleportDropdown.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        -- Jika Enter ditekan, coba teleport langsung
-        local selectedLocation = TeleportDropdown.Text
-        local cframe = teleportLocations[selectedLocation]
-        if cframe then
-            teleportPlayer(cframe, selectedLocation)
-        else
-            appendLog("Manual Teleport Error: Location '" .. selectedLocation .. "' not found.")
-            updateStatus("MANUAL_TP_ERROR")
+-- Hide dropdown if user clicks outside
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
+        local mousePos = UserInputService:GetMouseLocation()
+        local dropdownBounds = TeleportDropdownOptionsFrame.AbsolutePosition + TeleportDropdownOptionsFrame.AbsoluteSize
+        local displayBounds = TeleportDropdownDisplay.AbsolutePosition + TeleportDropdownDisplay.AbsoluteSize
+
+        local isClickInsideDropdown = mousePos.X >= TeleportDropdownOptionsFrame.AbsolutePosition.X and
+                                     mousePos.X <= dropdownBounds.X and
+                                     mousePos.Y >= TeleportDropdownOptionsFrame.AbsolutePosition.Y and
+                                     mousePos.Y <= dropdownBounds.Y
+
+        local isClickInsideDisplay = mousePos.X >= TeleportDropdownDisplay.AbsolutePosition.X and
+                                     mousePos.X <= displayBounds.X and
+                                     mousePos.Y >= TeleportDropdownDisplay.AbsolutePosition.Y and
+                                     mousePos.Y <= displayBounds.Y
+
+        if TeleportDropdownOptionsFrame.Visible and not isClickInsideDropdown and not isClickInsideDisplay then
+            TeleportDropdownOptionsFrame.Visible = false
+            TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
         end
     end
 end)
 
-TeleportDropdown.Changed:Connect(function(property)
-    if property == "Text" then
-        populateDropdown()
-    end
-end)
 
 TeleportButton.MouseButton1Click:Connect(function()
     scriptRunning = true -- Pastikan scriptRunning aktif saat UI digunakan
-    local selectedLocation = TeleportDropdown.Text
+    local selectedLocation = TeleportDropdownDisplay.Text
     local cframe = teleportLocations[selectedLocation]
     if cframe then
         teleportPlayer(cframe, selectedLocation)
     else
-        appendLog("Manual Teleport Error: Location '" .. selectedLocation .. "' not found.")
+        appendLog("Manual Teleport Error: Location '" .. selectedLocation .. "' not found or not selected.")
         updateStatus("MANUAL_TP_ERROR")
     end
 end)
@@ -717,60 +808,85 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Background)
     end
 end)
 
-task.spawn(function() -- Animasi UiTitleLabel (Glitch)
+task.spawn(function() -- Animasi UiTitleLabel (Glitch Text Transition)
     if not UiTitleLabel or not UiTitleLabel.Parent then return end
-    local originalText = UiTitleLabel.Text
-    local glitchChars = {"@", "#", "$", "%", "&", "*", "!", "?", "/", "\\", "|", "_"}
+    local originalText1 = "ANTARCTIC TELEPORT"
+    local originalText2 = "ZEDLIST X ZXHELL"
+    local currentTargetText = originalText1
+    local glitchChars = {"@", "#", "$", "%", "&", "*", "!", "?", "/", "\\", "|", "_", "1", "0"}
     local baseColor = Color3.fromRGB(255, 25, 25)
     local originalPos = UiTitleLabel.Position
+    local transitionTime = 1.5 -- Waktu transisi glitch
+    local displayTime = 5 -- Waktu menampilkan teks normal
 
-    while ScreenGui and ScreenGui.Parent do
-        if not isMinimized then -- Hanya beranimasi saat tidak diminimize
-            local r = math.random()
-            local isGlitchingText = false
-
-            if r < 0.02 then -- Glitch Text Parah & Posisi
-                isGlitchingText = true
-                local newText = ""
-                for i = 1, #originalText do
-                    if math.random() < 0.7 then
-                        newText = newText .. glitchChars[math.random(#glitchChars)]
-                    else
-                        newText = newText .. originalText:sub(i,i)
-                    end
-                end
-                UiTitleLabel.Text = newText
-                UiTitleLabel.TextColor3 = Color3.fromRGB(math.random(200,255), math.random(0,50), math.random(0,50))
-                UiTitleLabel.Position = originalPos + UDim2.fromOffset(math.random(-2,2), math.random(-2,2))
-                UiTitleLabel.Rotation = math.random(-1,1) * 0.5
-                task.wait(0.07)
-            elseif r < 0.1 then -- Glitch Warna & Stroke
-                UiTitleLabel.TextColor3 = Color3.fromHSV(math.random(), 1, 1)
-                UiTitleLabel.TextStrokeColor3 = Color3.fromHSV(math.random(), 0.8, 1)
-                UiTitleLabel.TextStrokeTransparency = math.random() * 0.3
-                UiTitleLabel.Rotation = math.random(-1,1) * 0.2
-                task.wait(0.1)
-            else -- Kembali normal atau animasi warna halus
-                UiTitleLabel.Text = originalText
-                UiTitleLabel.TextStrokeTransparency = 0.5
-                UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
-                UiTitleLabel.Position = originalPos
-                UiTitleLabel.Rotation = 0
-            end
-
-            -- Animasi warna RGB halus jika tidak sedang glitch parah
-            if not isGlitchingText then
-                local hue = (tick()*0.1) % 1
-                local r_rgb, g_rgb, b_rgb = Color3.fromHSV(hue, 1, 1).R, Color3.fromHSV(hue, 1, 1).G, Color3.fromHSV(hue, 1, 1).B
-                r_rgb = math.min(1, r_rgb + 0.6) -- Dominasi merah
-                g_rgb = g_rgb * 0.4
-                b_rgb = b_rgb * 0.4
-                UiTitleLabel.TextColor3 = Color3.new(r_rgb, g_rgb, b_rgb)
+    local function applyGlitch(text)
+        local newText = ""
+        for i = 1, #text do
+            if math.random() < 0.7 then -- Probabilitas glitch karakter
+                newText = newText .. glitchChars[math.random(#glitchChars)]
+            else
+                newText = newText .. text:sub(i,i)
             end
         end
-        task.wait(0.05)
+        return newText
+    end
+
+    while ScreenGui and ScreenGui.Parent do
+        if not isMinimized then
+            -- Glitch transition
+            local startTime = tick()
+            while tick() - startTime < transitionTime do
+                local progress = (tick() - startTime) / transitionTime
+                local mixedText = ""
+                local textToGlitch = (currentTargetText == originalText1) and originalText2 or originalText1
+
+                for i = 1, math.max(#currentTargetText, #textToGlitch) do
+                    local char1 = currentTargetText:sub(i,i)
+                    local char2 = textToGlitch:sub(i,i)
+
+                    if math.random() < progress then -- Semakin lama, semakin banyak karakter target
+                        mixedText = mixedText .. (char2 ~= "" and char2 or glitchChars[math.random(#glitchChars)])
+                    else
+                        mixedText = mixedText .. (char1 ~= "" and char1 or glitchChars[math.random(#glitchChars)])
+                    end
+                end
+                UiTitleLabel.Text = applyGlitch(mixedText)
+                UiTitleLabel.TextColor3 = Color3.fromHSV(math.random(), 1, 1)
+                UiTitleLabel.Position = originalPos + UDim2.fromOffset(math.random(-2,2), math.random(-2,2))
+                UiTitleLabel.Rotation = math.random(-1,1) * 0.5
+                task.wait(0.05)
+            end
+
+            -- Display target text normally
+            UiTitleLabel.Text = currentTargetText
+            UiTitleLabel.TextColor3 = baseColor
+            UiTitleLabel.TextStrokeTransparency = 0.5
+            UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
+            UiTitleLabel.Position = originalPos
+            UiTitleLabel.Rotation = 0
+
+            -- Wait for display time
+            task.wait(displayTime)
+
+            -- Switch target text for next cycle
+            if currentTargetText == originalText1 then
+                currentTargetText = originalText2
+            else
+                currentTargetText = originalText1
+            end
+        else
+            -- If minimized, ensure it shows originalText1 without glitch
+            UiTitleLabel.Text = originalText1
+            UiTitleLabel.TextColor3 = baseColor
+            UiTitleLabel.TextStrokeTransparency = 0.5
+            UiTitleLabel.TextStrokeColor3 = Color3.fromRGB(50,0,0)
+            UiTitleLabel.Position = originalPos
+            UiTitleLabel.Rotation = 0
+            task.wait(0.05)
+        end
     end
 end)
+
 
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
     local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton, TeleportButton}
