@@ -44,8 +44,8 @@ ManualTeleportFrame.Name = "ManualTeleportFrame"
 local ManualTeleportTitle = Instance.new("TextLabel")
 ManualTeleportTitle.Name = "ManualTeleportTitle"
 
-local TeleportDropdownDisplay = Instance.new("TextBox") -- Display for the selected location
-TeleportDropdownDisplay.Name = "TeleportDropdownDisplay"
+local TeleportLocationSelector = Instance.new("TextButton") -- Changed from TextBox to TextButton for dropdown trigger
+TeleportLocationSelector.Name = "TeleportLocationSelector"
 
 local TeleportDropdownOptionsFrame = Instance.new("ScrollingFrame") -- Frame for dropdown options
 TeleportDropdownOptionsFrame.Name = "TeleportDropdownOptionsFrame"
@@ -125,7 +125,7 @@ local function setupCoreGuiParenting()
     minimizedZLabel.Parent = Frame -- Parentkan label Z ke Frame
     ManualTeleportFrame.Parent = Frame
     ManualTeleportTitle.Parent = ManualTeleportFrame
-    TeleportDropdownDisplay.Parent = ManualTeleportFrame
+    TeleportLocationSelector.Parent = ManualTeleportFrame -- Changed parent
     TeleportDropdownOptionsFrame.Parent = ManualTeleportFrame
     TeleportButton.Parent = ManualTeleportFrame
     LogFrame.Parent = Frame
@@ -299,27 +299,27 @@ ManualTeleportTitle.BackgroundTransparency = 1
 ManualTeleportTitle.TextXAlignment = Enum.TextXAlignment.Left
 ManualTeleportTitle.ZIndex = 2
 
-TeleportDropdownDisplay.Size = UDim2.new(1, -20, 0, 30)
-TeleportDropdownDisplay.Position = UDim2.new(0, 10, 0, 40)
-TeleportDropdownDisplay.Text = "Select Location..."
-TeleportDropdownDisplay.PlaceholderText = "Click to select"
-TeleportDropdownDisplay.Font = Enum.Font.SourceSansSemibold
-TeleportDropdownDisplay.TextSize = 14
-TeleportDropdownDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeleportDropdownDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-TeleportDropdownDisplay.ClearTextOnFocus = false
-TeleportDropdownDisplay.BorderColor3 = Color3.fromRGB(100, 100, 120)
-TeleportDropdownDisplay.BorderSizePixel = 1
-TeleportDropdownDisplay.ZIndex = 2
-TeleportDropdownDisplay.TextEditable = false -- Make it not directly editable by typing
+-- Teleport Location Selector (Trigger for Dropdown)
+TeleportLocationSelector.Size = UDim2.new(1, -20, 0, 30)
+TeleportLocationSelector.Position = UDim2.new(0, 10, 0, 40)
+TeleportLocationSelector.Text = "Select Location..."
+TeleportLocationSelector.Font = Enum.Font.SourceSansSemibold
+TeleportLocationSelector.TextSize = 14
+TeleportLocationSelector.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportLocationSelector.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+TeleportLocationSelector.BorderSizePixel = 1
+TeleportLocationSelector.BorderColor3 = Color3.fromRGB(100, 100, 120)
+TeleportLocationSelector.ZIndex = 2
+TeleportLocationSelector.TextXAlignment = Enum.TextXAlignment.Left
+TeleportLocationSelector.TextWrapped = true
 
-local DropdownDisplayCorner = Instance.new("UICorner")
-DropdownDisplayCorner.CornerRadius = UDim.new(0, 3)
-DropdownDisplayCorner.Parent = TeleportDropdownDisplay
+local SelectorCorner = Instance.new("UICorner")
+SelectorCorner.CornerRadius = UDim.new(0, 3)
+SelectorCorner.Parent = TeleportLocationSelector
 
 -- Dropdown Options Frame (ScrollingFrame)
 TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, 100) -- Height will expand
-TeleportDropdownOptionsFrame.Position = UDim2.new(0, 10, 0, 70) -- Position below the display
+TeleportDropdownOptionsFrame.Position = UDim2.new(0, 10, 0, 70) -- Position below the selector
 TeleportDropdownOptionsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 TeleportDropdownOptionsFrame.BorderSizePixel = 1
 TeleportDropdownOptionsFrame.BorderColor3 = Color3.fromRGB(100, 100, 120)
@@ -340,7 +340,7 @@ UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 UIListLayout.Padding = UDim.new(0, 2)
 
 TeleportButton.Size = UDim2.new(1, -20, 0, 30)
-TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Adjusted position for button
+TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Adjusted position for button (initial)
 TeleportButton.Text = "TELEPORT"
 TeleportButton.Font = Enum.Font.SourceSansBold
 TeleportButton.TextSize = 14
@@ -703,19 +703,21 @@ local function populateDropdownOptions()
         end)
 
         optionButton.MouseButton1Click:Connect(function()
-            TeleportDropdownDisplay.Text = locationName
+            TeleportLocationSelector.Text = locationName
             TeleportDropdownOptionsFrame.Visible = false
-            TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
+            -- Reset button position after selection
+            TeleportButton.Position = UDim2.new(0, 10, 0, 80)
         end)
     end
     -- Adjust the height of the dropdown options frame based on content
     TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, math.min(150, #sortedLocations * (optionHeight + UIListLayout.Padding.Offset)))
 end
 
-TeleportDropdownDisplay.MouseButton1Click:Connect(function()
+TeleportLocationSelector.MouseButton1Click:Connect(function() -- Changed from TeleportDropdownDisplay
     if TeleportDropdownOptionsFrame.Visible then
         TeleportDropdownOptionsFrame.Visible = false
-        TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
+        -- Reset button position when closing dropdown
+        TeleportButton.Position = UDim2.new(0, 10, 0, 80)
     else
         populateDropdownOptions()
         TeleportDropdownOptionsFrame.Visible = true
@@ -729,19 +731,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
         local mousePos = UserInputService:GetMouseLocation()
         local dropdownBounds = TeleportDropdownOptionsFrame.AbsolutePosition + TeleportDropdownOptionsFrame.AbsoluteSize
-        local displayBounds = TeleportDropdownDisplay.AbsolutePosition + TeleportDropdownDisplay.AbsoluteSize
+        local selectorBounds = TeleportLocationSelector.AbsolutePosition + TeleportLocationSelector.AbsoluteSize -- Changed to selector
 
         local isClickInsideDropdown = mousePos.X >= TeleportDropdownOptionsFrame.AbsolutePosition.X and
                                      mousePos.X <= dropdownBounds.X and
                                      mousePos.Y >= TeleportDropdownOptionsFrame.AbsolutePosition.Y and
                                      mousePos.Y <= dropdownBounds.Y
 
-        local isClickInsideDisplay = mousePos.X >= TeleportDropdownDisplay.AbsolutePosition.X and
-                                     mousePos.X <= displayBounds.X and
-                                     mousePos.Y >= TeleportDropdownDisplay.AbsolutePosition.Y and
-                                     mousePos.Y <= displayBounds.Y
+        local isClickInsideSelector = mousePos.X >= TeleportLocationSelector.AbsolutePosition.X and
+                                     mousePos.X <= selectorBounds.X and
+                                     mousePos.Y >= TeleportLocationSelector.AbsolutePosition.Y and
+                                     mousePos.Y <= selectorBounds.Y
 
-        if TeleportDropdownOptionsFrame.Visible and not isClickInsideDropdown and not isClickInsideDisplay then
+        if TeleportDropdownOptionsFrame.Visible and not isClickInsideDropdown and not isClickInsideSelector then
             TeleportDropdownOptionsFrame.Visible = false
             TeleportButton.Position = UDim2.new(0, 10, 0, 80) -- Reset button position
         end
@@ -751,7 +753,7 @@ end)
 
 TeleportButton.MouseButton1Click:Connect(function()
     scriptRunning = true -- Pastikan scriptRunning aktif saat UI digunakan
-    local selectedLocation = TeleportDropdownDisplay.Text
+    local selectedLocation = TeleportLocationSelector.Text -- Changed from TeleportDropdownDisplay
     local cframe = teleportLocations[selectedLocation]
     if cframe then
         teleportPlayer(cframe, selectedLocation)
@@ -889,7 +891,7 @@ end)
 
 
 task.spawn(function() -- Animasi Tombol (Subtle Pulse)
-    local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton, TeleportButton}
+    local buttonsToAnimate = {StartAutoTeleportButton, ApplyTimersButton, MinimizeButton, TeleportButton, TeleportLocationSelector} -- Added TeleportLocationSelector
     while ScreenGui and ScreenGui.Parent do
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             for _, btn in ipairs(buttonsToAnimate) do
