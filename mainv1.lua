@@ -126,7 +126,7 @@ local function setupCoreGuiParenting()
     ManualTeleportFrame.Parent = Frame
     ManualTeleportTitle.Parent = ManualTeleportFrame
     TeleportLocationSelector.Parent = ManualTeleportFrame -- Changed parent
-    -- TeleportDropdownOptionsFrame.Parent will be set dynamically to Frame
+    TeleportDropdownOptionsFrame.Parent = Frame -- Explicitly parent to Frame for dropdown visibility
     TeleportButton.Parent = ManualTeleportFrame
     LogFrame.Parent = Frame
     LogTitle.Parent = LogFrame
@@ -673,44 +673,50 @@ local function populateDropdownOptions()
         end
     end
 
-    local sortedLocations = {}
-    for name, _ in pairs(teleportLocations) do
-        table.insert(sortedLocations, name)
-    end
-    table.sort(sortedLocations)
+    -- Define the order of locations for the dropdown
+    local orderedLocations = {
+        "Camp 1 Main Tent", "Camp 1 Checkpoint",
+        "Camp 2 Main Tent", "Camp 2 Checkpoint",
+        "Camp 3 Main Tent", "Camp 3 Checkpoint",
+        "Camp 4 Main Tent", "Camp 4 Checkpoint",
+        "South Pole Checkpoint"
+    }
 
     local optionHeight = 25
-    for i, locationName in ipairs(sortedLocations) do
-        local optionButton = Instance.new("TextButton")
-        optionButton.Name = "Option_" .. i
-        optionButton.Parent = TeleportDropdownOptionsFrame
-        optionButton.Size = UDim2.new(1, 0, 0, optionHeight)
-        optionButton.Text = locationName
-        optionButton.Font = Enum.Font.SourceSans
-        optionButton.TextSize = 12
-        optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-        optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-        optionButton.BorderSizePixel = 0
-        optionButton.TextXAlignment = Enum.TextXAlignment.Left
-        optionButton.TextWrapped = true
-
-        -- Hover effect
-        optionButton.MouseEnter:Connect(function()
-            optionButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-        end)
-        optionButton.MouseLeave:Connect(function()
+    for i, locationName in ipairs(orderedLocations) do -- Iterate through orderedLocations
+        -- Ensure the location actually exists in teleportLocations before creating an option
+        if teleportLocations[locationName] then
+            local optionButton = Instance.new("TextButton")
+            optionButton.Name = "Option_" .. i
+            optionButton.Parent = TeleportDropdownOptionsFrame
+            optionButton.Size = UDim2.new(1, 0, 0, optionHeight)
+            optionButton.Text = locationName
+            optionButton.Font = Enum.Font.SourceSans
+            optionButton.TextSize = 12
+            optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
             optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-        end)
+            optionButton.BorderSizePixel = 0
+            optionButton.TextXAlignment = Enum.TextXAlignment.Left
+            optionButton.TextWrapped = true
 
-        optionButton.MouseButton1Click:Connect(function()
-            TeleportLocationSelector.Text = locationName
-            TeleportDropdownOptionsFrame.Visible = false
-            -- Reset button position after selection
-            TeleportButton.Position = UDim2.new(0, 10, 0, 80)
-        end)
+            -- Hover effect
+            optionButton.MouseEnter:Connect(function()
+                optionButton.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            end)
+            optionButton.MouseLeave:Connect(function()
+                optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+            end)
+
+            optionButton.MouseButton1Click:Connect(function()
+                TeleportLocationSelector.Text = locationName
+                TeleportDropdownOptionsFrame.Visible = false
+                -- Reset button position after selection
+                TeleportButton.Position = UDim2.new(0, 10, 0, 80)
+            end)
+        end
     end
     -- Adjust the height of the dropdown options frame based on content
-    TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0, 0, 0, #sortedLocations * (optionHeight + UIListLayout.Padding.Offset))
+    TeleportDropdownOptionsFrame.CanvasSize = UDim2.new(0, 0, 0, #orderedLocations * (optionHeight + UIListLayout.Padding.Offset))
     TeleportDropdownOptionsFrame.Size = UDim2.new(1, -20, 0, math.min(150, TeleportDropdownOptionsFrame.CanvasSize.Y.Offset))
 end
 
@@ -789,28 +795,45 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
     local borderBase = Color3.fromRGB(255,0,0)
     local borderGlitch = Color3.fromRGB(0,255,255)
     local borderThicknessBase = 2
+    local glitchCharsBorder = {"Z", "X", "H", "E", "L", "L", "1", "0", "!", "@", "#", "$"} -- Karakter untuk border glitch
 
     while ScreenGui and ScreenGui.Parent do
         if not isMinimized then -- Hanya beranimasi saat tidak diminimize
             local r = math.random()
-            if r < 0.08 then -- Glitch intens (lebih sering)
+            if r < 0.15 then -- Glitch intens (lebih sering)
                 Frame.BackgroundColor3 = glitchColor1
                 Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255)) -- Warna acak
                 Frame.BorderSizePixel = math.random(3, 7) -- Ketebalan acak
+                -- Mengganti border dengan huruf Z yang berglitch
+                local glitchText = ""
+                for i = 1, math.floor(Frame.AbsoluteSize.X / 10) do -- Sesuaikan kerapatan huruf Z
+                    glitchText = glitchText .. glitchCharsBorder[math.random(#glitchCharsBorder)]
+                end
+                Frame.Text = glitchText -- Menggunakan properti Text pada Frame (jika ada, atau simulasi)
+                Frame.BackgroundTransparency = 0.8 -- Make background slightly visible for text
+                Frame.LayoutOrder = math.random(-1,1) -- Random slight movement
+
                 task.wait(0.05)
                 Frame.BackgroundColor3 = glitchColor2
                 Frame.BorderColor3 = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
                 Frame.BorderSizePixel = math.random(1, 5)
+                Frame.Text = "" -- Clear text after glitch
+                Frame.BackgroundTransparency = 0 -- Reset transparency
+                Frame.LayoutOrder = 0
                 task.wait(0.05)
-            elseif r < 0.3 then -- Glitch ringan (lebih sering)
+            elseif r < 0.4 then -- Glitch ringan (lebih sering)
                 Frame.BackgroundColor3 = Color3.Lerp(baseColor, glitchColor1, math.random())
                 Frame.BorderColor3 = Color3.Lerp(borderBase, borderGlitch, math.random()*0.8)
                 Frame.BorderSizePixel = math.random(2, 4)
+                Frame.Text = "" -- Ensure no text during light glitch
+                Frame.BackgroundTransparency = 0
                 task.wait(0.1)
             else
                 Frame.BackgroundColor3 = baseColor
                 Frame.BorderColor3 = borderBase
                 Frame.BorderSizePixel = borderThicknessBase
+                Frame.Text = "" -- Ensure no text when normal
+                Frame.BackgroundTransparency = 0
             end
             -- Animasi border utama (HSV shift) yang lebih halus saat tidak glitch intens
             local h,s,v = Color3.toHSV(Frame.BorderColor3)
@@ -819,6 +842,8 @@ task.spawn(function() -- Animasi Latar Belakang Frame (Glitchy Border)
             Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
             Frame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Atau warna solid apa pun yang Anda inginkan untuk pop-up
             Frame.BorderSizePixel = borderThicknessBase
+            Frame.Text = ""
+            Frame.BackgroundTransparency = 0
         end
         task.wait(0.05)
     end
