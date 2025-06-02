@@ -376,6 +376,60 @@ local function fireRemoteEnhanced(remoteName, pathType, ...)
     return success
 end
 
+-- // Fungsi untuk menemukan part dari string path //
+-- Ini akan mengurai string seperti 'workspace["Folder%"].Part' atau 'workspace.Folder.Part'
+local function findPartFromPathString(pathString)
+    local currentInstance = game:GetService("Workspace")
+    -- Hapus "workspace" prefix jika ada, dan tangani spasi/titik di awal/akhir
+    local cleanPath = pathString:gsub("^%s*workspace%s*%.?%s*", ""):gsub("%s*$", "")
+
+    -- Pisahkan path menjadi komponen, tangani notasi titik dan kurung siku
+    local pathComponents = {}
+    local cursor = 1
+    while cursor <= #cleanPath do
+        local char = cleanPath:sub(cursor, cursor)
+        if char == '[' then
+            -- Tangani akses kurung siku, misal ["Nama%"]
+            local closingQuote = cleanPath:find('"', cursor + 2) -- Cari kutip penutup setelah ["
+            local closingBracket = cleanPath:find(']', closingQuote + 1) -- Cari kurung siku penutup setelah kutip
+            if closingQuote and closingBracket then
+                local nameStart = cursor + 2 -- Lewati ['"
+                local nameEnd = closingQuote - 1 -- Sebelum "]
+                local name = cleanPath:sub(nameStart, nameEnd)
+                table.insert(pathComponents, name)
+                cursor = closingBracket + 1 -- Lewati "]
+            else
+                warn("Malformed path string (unclosed bracket or quote): " .. pathString)
+                return nil
+            end
+        elseif char == '.' then
+            -- Lewati titik
+            cursor = cursor + 1
+        else
+            -- Tangani nama biasa (alfanumerik, underscore)
+            local nextSpecialChar = cleanPath:find('[%.%[]', cursor)
+            local name
+            if nextSpecialChar then
+                name = cleanPath:sub(cursor, nextSpecialChar - 1)
+                cursor = nextSpecialChar
+            else
+                name = cleanPath:sub(cursor)
+                cursor = #cleanPath + 1
+            end
+            table.insert(pathComponents, name)
+        end
+    end
+
+    for _, name in ipairs(pathComponents) do
+        if currentInstance then
+            currentInstance = currentInstance:FindFirstChild(name)
+        else
+            return nil -- Path rusak, part tidak ditemukan
+        end
+    end
+    return currentInstance
+end
+
 -- // Fungsi bantu untuk ekspedisi //
 local function teleportTo(targetPart)
     if not scriptRunning then return false end
@@ -472,7 +526,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("WAIT 5S, TP TO CAMP1...")
         waitSeconds(timers.teleportWait)
-        local camp1Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp1")
+        local camp1Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp1')
         if not teleportTo(camp1Part) then break end
 
         -- Langkah 3: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 1
@@ -481,7 +535,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP1...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpointCamp1 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 1") and game:GetService("Workspace")["Checkpoints%"]["Camp 1"]:FindFirstChild("SpawnLocation")
+        local checkpointCamp1 = findPartFromPathString('workspace["Checkpoints%"]["Camp 1"].SpawnLocation')
         if not teleportTo(checkpointCamp1) then break end
 
         -- Langkah 4: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp2
@@ -489,7 +543,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("CHECKPOINT CAMP1 REACHED, TP TO CAMP2...")
         waitSeconds(timers.teleportWait)
-        local camp2Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp2")
+        local camp2Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp2')
         if not teleportTo(camp2Part) then break end
 
         -- Langkah 5: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 2
@@ -498,7 +552,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP2...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpointCamp2 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 2") and game:GetService("Workspace")["Checkpoints%"]["Camp 2"]:FindFirstChild("SpawnLocation")
+        local checkpointCamp2 = findPartFromPathString('workspace["Checkpoints%"]["Camp 2"].SpawnLocation')
         if not teleportTo(checkpointCamp2) then break end
 
         -- Langkah 6: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp3
@@ -506,7 +560,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("CHECKPOINT CAMP2 REACHED, TP TO CAMP3...")
         waitSeconds(timers.teleportWait)
-        local camp3Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp3")
+        local camp3Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp3')
         if not teleportTo(camp3Part) then break end
 
         -- Langkah 7: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 3
@@ -515,7 +569,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP3...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpointCamp3 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 3") and game:GetService("Workspace")["Checkpoints%"]["Camp 3"]:FindFirstChild("SpawnLocation")
+        local checkpointCamp3 = findPartFromPathString('workspace["Checkpoints%"]["Camp 3"].SpawnLocation')
         if not teleportTo(checkpointCamp3) then break end
 
         -- Langkah 8: Jika sudah cek poin maka tunggu 5 detik kemudian teleport kesini: Camp4
@@ -523,7 +577,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("CHECKPOINT CAMP3 REACHED, TP TO CAMP4...")
         waitSeconds(timers.teleportWait)
-        local camp4Part = game:GetService("Workspace"):FindFirstChild("Camp_Main_Tents%") and game:GetService("Workspace")["Camp_Main_Tents%"]:FindFirstChild("Camp4")
+        local camp4Part = findPartFromPathString('workspace["Camp_Main_Tents%"].Camp4')
         if not teleportTo(camp4Part) then break end
 
         -- Langkah 9: Tunggu 5 menit kemudian teleport ke cek poin ini: Checkpoint Camp 4
@@ -532,7 +586,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO CHECKPOINT CAMP4...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local checkpointCamp4 = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("Camp 4") and game:GetService("Workspace")["Checkpoints%"]["Camp 4"]:FindFirstChild("SpawnLocation")
+        local checkpointCamp4 = findPartFromPathString('workspace["Checkpoints%"]["Camp 4"].SpawnLocation')
         if not teleportTo(checkpointCamp4) then break end
 
         -- Langkah 10: Tunggu 5 menit kemudian teleport ke cek poin ini: South Pole SpawnLocation
@@ -540,7 +594,7 @@ local function runExpeditionCycle()
         if not scriptRunning then break end
         updateStatus("WAIT 5M, TP TO SOUTH_POLE_SPAWN...")
         waitSeconds(timers.longWaitBeforeCheckpoint)
-        local southPoleSpawn = game:GetService("Workspace"):FindFirstChild("Checkpoints%") and game:GetService("Workspace")["Checkpoints%"]:FindFirstChild("South Pole") and game:GetService("Workspace")["Checkpoints%"]["South Pole"]:FindFirstChild("SpawnLocation")
+        local southPoleSpawn = findPartFromPathString('workspace["Checkpoints%"]["South Pole"].SpawnLocation')
         if not teleportTo(southPoleSpawn) then break end
 
         -- Langkah 11: Minum air setiap 7 menit (ditangani oleh waterDrinkThread terpisah)
@@ -587,7 +641,7 @@ StartButton.MouseButton1Click:Connect(function()
 
         -- Teleport awal ke Basecamp (Langkah 1 dari alur)
         -- Alur Script: Tunggu 5 detik kemudian teleport ke ini : workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp
-        local basecampPart = game:GetService("Workspace"):FindFirstChild("Search_And_Rescue%") and game:GetService("Workspace")["Search_And_Rescue%"]:FindFirstChild("Helicopter_Spawn_Clickers") and game:GetService("Workspace")["Search_And_Rescue%"]["Helicopter_Spawn_Clickers"]:FindFirstChild("Basecamp")
+        local basecampPart = findPartFromPathString('workspace["Search_And_Rescue%"].Helicopter_Spawn_Clickers.Basecamp')
         if basecampPart then
             updateStatus("INITIAL TP TO BASECAMP...")
             teleportTo(basecampPart)
