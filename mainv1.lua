@@ -91,19 +91,19 @@ local teleportLocations = {
     -- Camp 1
     ["Camp 1 Main Tent"] = CFrame.new(-3694.08691, 225.826172, 277.052979, 0.710165381, 0, 0.704034865, 0, 1, 0, -0.704034865, 0, 0.710165381),
     ["Camp 1 Checkpoint"] = CFrame.new(-3719.18188, 223.203995, 235.391006, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-    ["WaterRefill_Camp1"] = CFrame.new(-3690, 225, 280), -- Contoh posisi WaterRefill Camp 1
+    ["WaterRefill_Camp1"] = CFrame.new(-3718.26001, 228.797501, 264.399994, 1.41859055e-05, 0.998563945, -0.0535728931, 1, -1.43051147e-05, 3.81842256e-07, -3.81842256e-07, -0.0535728931, -0.998564005),
     -- Camp 2
     ["Camp 2 Main Tent"] = CFrame.new(1774.76111, 102.314171, -179.4328, -0.790706277, 0, -0.612195849, 0, 1, 0, 0.612195849, 0, -0.790706277),
     ["Camp 2 Checkpoint"] = CFrame.new(1790.31799, 103.665001, -137.858994, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-    ["WaterRefill_Camp2"] = CFrame.new(1770, 102, -185), -- Contoh posisi WaterRefill Camp 2
+    ["WaterRefill_Camp2"] = CFrame.new(1800.04199, 105.285774, -163.363998, 7.74860382e-06, 0.142248183, 0.989830971, 1, -7.62939453e-06, -6.67572021e-06, 6.67572021e-06, 0.989830971, -0.142248154),
     -- Camp 3
     ["Camp 3 Main Tent"] = CFrame.new(5853.9834, 325.546478, -0.24318853, 0.494506121, -0, -0.869174123, 0, 1, -0, 0.869174123, 0, 0.494506121),
     ["Camp 3 Checkpoint"] = CFrame.new(5892.38916, 319.35498, -19.0779991, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-    ["WaterRefill_Camp3"] = CFrame.new(5850, 325, -5), -- Contoh posisi WaterRefill Camp 3
+    ["WaterRefill_Camp3"] = CFrame.new(5884.9502, 321.003143, 6.29623318, 2.13384628e-05, 0.635085583, -0.772441745, 1, -2.13384628e-05, 1.0073185e-05, -1.0073185e-05, -0.772441745, -0.635085583),
     -- Camp 4
     ["Camp 4 Main Tent"] = CFrame.new(8999.26465, 593.866089, 59.4377747, -0.999371052, 0, 0.035472773, 0, 1, 0, -0.035472773, 0, -0.999371052),
     ["Camp 4 Checkpoint"] = CFrame.new(8992.36328, 594.10498, 103.060997, 0, 0, 1, 0, 1, -0, -1, 0, 0),
-    ["WaterRefill_Camp4"] = CFrame.new(8995, 593, 65), -- Contoh posisi WaterRefill Camp 4
+    ["WaterRefill_Camp4"] = CFrame.new(9000.68652, 597.380127, 85.107872, 2.74181366e-06, -0.18581143, 0.982585371, 1, 2.74181366e-06, -2.2649765e-06, -2.2649765e-06, 0.982585371, 0.18581146),
     -- South Pole
     ["South Pole Checkpoint"] = CFrame.new(10995.2461, 545.255127, 114.804474, 0.819186032, 0.573527873, 3.9935112e-06, -3.9935112e-06, 1.2755394e-05, -1, -0.573527873, 0.819186091, 1.2755394e-05),
 }
@@ -626,16 +626,16 @@ local function drinkWater()
             if remoteEvent then
                 for i = 1, timers.water_drink_count do
                     remoteEvent:FireServer()
-                    appendLog("Drinking water (" .. i .. "/" .. timers.water_drink_count .. ")")
+                    appendLog("Drinking water (" .. i .. "/" .. timers.water_drink_count .. " times)")
                     task.wait(0.5) -- Delay singkat antar minum
                 end
                 appendLog("Finished drinking water.")
                 waterDrinkCounter = 0 -- Reset counter setelah minum
             else
-                appendLog("RemoteEvent not found in Water Bottle.")
+                appendLog("RemoteEvent not found in Water Bottle. Make sure 'Water Bottle' has a 'RemoteEvent' child.")
             end
         else
-            appendLog("Water Bottle not found in character.")
+            appendLog("Water Bottle not found in character. Make sure your character has a 'Water Bottle' object.")
         end
     else
         appendLog("Player character not found for drinking water.")
@@ -776,6 +776,7 @@ local function populateDropdownOptions()
     end
 
     -- Define the order of locations for the dropdown
+    -- Termasuk lokasi WaterRefill_CampX dalam daftar yang diurutkan
     local orderedLocations = {
         "Camp 1 Main Tent", "Camp 1 Checkpoint", "WaterRefill_Camp1",
         "Camp 2 Main Tent", "Camp 2 Checkpoint", "WaterRefill_Camp2",
@@ -900,7 +901,7 @@ task.spawn(function()
         waterDrinkTimer = waterDrinkTimer + 1
         if waterDrinkTimer >= timers.water_drink_interval then
             waterDrinkCounter = waterDrinkCounter + 1
-            appendLog("Time to drink water! (" .. waterDrinkCounter .. "/" .. timers.water_drink_count .. " times left)")
+            appendLog("Time to drink water! (" .. waterDrinkCounter .. "/" .. timers.water_drink_count .. " times)")
             drinkWater()
             waterDrinkTimer = 0 -- Reset timer
         end
