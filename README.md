@@ -1,2 +1,119 @@
-# XSC003
-Roblox Antarctic Expedition Teleport ScriptIni adalah script Lua yang dirancang untuk game Roblox "Ekspedisi Antartika", yang dapat dieksekusi menggunakan executor seperti Arcues Executor. Script ini menyediakan fungsionalitas teleportasi otomatis dan manual dengan antarmuka pengguna (UI) yang terinspirasi oleh gaya cyberpunk dan efek glitch.FiturAuto Teleport: Secara otomatis melakukan teleportasi melalui serangkaian lokasi yang telah ditentukan dalam game, mengikuti alur ekspedisi (Camp 1, Camp 2, Camp 3, Camp 4, hingga South Pole).Manual Teleport: Memungkinkan pengguna untuk memilih dan teleportasi secara instan ke lokasi spesifik dari daftar yang tersedia melalui dropdown interaktif.Pengaturan Waktu Auto Teleport: Konfigurasikan waktu tunggu di setiap lokasi dan penundaan antar teleportasi dalam mode otomatis.Status Log: Log real-time yang menampilkan status script, informasi teleportasi, dan pesan error.UI Glitchy & Interaktif:Judul UI bertransisi antara "ANTARCTIC TELEPORT" dan "ZEDLIST X ZXHELL" dengan efek glitch RGB yang dinamis.Border UI memiliki animasi glitch yang intens, memberikan tampilan "rusak" yang unik.Tombol-tombol UI menampilkan efek pulse yang halus.Fitur minimize UI yang mengubah UI menjadi ikon 'Z' kecil dengan animasi RGB.Penanganan Error Teleportasi: Dilengkapi dengan logika untuk mencegah karakter menembus tanah atau terjebak setelah teleportasi, menggunakan offset Y dan penonaktifan sementara CanCollide.Cara MenggunakanDapatkan Executor: Pastikan Anda memiliki Roblox Executor yang berfungsi (misalnya, Arcues Executor).Salin Script: Salin seluruh kode dari file main_teleport_script.lua ini.Tempel & Eksekusi: Buka Executor Anda, tempelkan kode ke dalamnya, dan eksekusi.UI Muncul: Antarmuka pengguna akan muncul di layar game Anda.Menggunakan Auto TeleportKlik tombol "START AUTO TELEPORT".Script akan mulai teleportasi secara otomatis melalui lokasi-lokasi yang telah ditentukan.Untuk menghentikan, klik tombol yang sama (sekarang akan bertuliskan "STOP AUTO TELEPORT").Anda dapat mengatur waktu tunggu di setiap lokasi dan penundaan antar teleportasi melalui bagian "AUTO TELEPORT SETTINGS" dan klik "APPLY SETTINGS".Menggunakan Manual TeleportDi bagian "MANUAL TELEPORT", klik tombol "Select Location...".Sebuah dropdown akan muncul menampilkan daftar lokasi teleportasi yang tersedia (Camp 1, Camp 2, dll.).Pilih lokasi yang Anda inginkan dari daftar.Klik tombol "TELEPORT" untuk langsung berpindah ke lokasi tersebut.Status LogBagian "STATUS LOG" akan menampilkan pesan-pesan penting tentang aktivitas script, termasuk keberhasilan teleportasi dan error yang mungkin terjadi.Log akan secara otomatis dibersihkan setiap 60 detik untuk menjaga keterbacaan.Lokasi Teleportasi yang Telah DitentukanScript ini mencakup CFrame untuk lokasi-lokasi penting berikut di game Ekspedisi Antartika:Camp 1 Main TentCamp 1 CheckpointCamp 2 Main TentCamp 2 CheckpointCamp 3 Main TentCamp 3 CheckpointCamp 4 Main TentCamp 4 CheckpointSouth Pole CheckpointPenanganan ErrorScript ini memiliki mekanisme penanganan error dasar untuk teleportasi, termasuk:Mencegah karakter menembus tanah dengan menambahkan offset Y kecil.Menonaktifkan sementara tabrakan karakter saat teleportasi untuk menghindari bug.Mencatat error teleportasi ke dalam log status untuk memudahkan debugging.DisclaimerScript ini dibuat untuk tujuan hiburan dan otomatisasi dalam game Roblox. Penggunaan script pihak ketiga mungkin melanggar Ketentuan Layanan Roblox. Gunakan dengan risiko Anda sendiri. Pengembang script tidak bertanggung jawab atas konsekuensi apa pun yang timbul dari penggunaannya.
+
+
+# ❄️ XSC003 - Roblox Antarctic Expedition Teleport Script
+
+**XSC003** adalah skrip Lua yang dirancang untuk game **Roblox: Ekspedisi Antartika**. Skrip ini dapat dieksekusi menggunakan executor seperti **Arcues Executor** dan menyediakan fungsionalitas teleportasi **otomatis** dan **manual** melalui antarmuka pengguna bergaya **cyberpunk dengan efek glitch dinamis**.
+
+---
+
+## ✨ Fitur Utama
+
+* **🔁 Auto Teleport**
+  Teleportasi otomatis ke lokasi-lokasi penting dalam alur ekspedisi:
+  *Camp 1 → Camp 2 → Camp 3 → Camp 4 → South Pole*.
+
+* **🧭 Manual Teleport Interaktif**
+  Pilih lokasi secara instan melalui dropdown UI yang rapi dan mudah digunakan.
+
+* **⏱️ Pengaturan Waktu Auto Teleport**
+  Atur *wait time* di setiap lokasi dan *delay* antar teleport langsung dari UI.
+
+* **📋 Status Log Real-time**
+  Menampilkan status skrip, hasil teleportasi, dan error secara langsung di UI.
+
+* **🖥️ Antarmuka Pengguna (UI) Dinamis**
+
+  * **Judul Glitch & RGB:** Berganti antara `ANTARCTIC TELEPORT` dan `ZEDLIST X ZXHELL`.
+  * **Border Glitch:** Border UI beranimasi glitch secara acak.
+  * **Tombol Interaktif:** Efek pulse saat idle dan highlight saat aktif.
+  * **Minimize Mode:** Ubah UI menjadi ikon RGB `Z` kecil untuk menghemat layar.
+
+* **🛡️ Penanganan Error Teleportasi Lanjutan**
+  Fitur *anti-clipping*, *CanCollide off* sementara, dan retry otomatis saat teleport gagal.
+
+---
+
+## 🚀 Cara Menggunakan
+
+1. **Dapatkan Executor**
+   Gunakan executor Roblox terpercaya (misal: **Arcues Executor**).
+
+2. **Salin Script**
+   Salin seluruh isi file `main_teleport_script.lua`.
+
+3. **Tempel & Eksekusi**
+   Tempel skrip di executor Anda, lalu eksekusi.
+
+4. **UI Akan Muncul**
+   UI teleport akan langsung tampil di layar game Anda.
+
+---
+
+## ⚙️ Menggunakan Fitur Auto Teleport
+
+* Klik tombol besar **`START AUTO TELEPORT`**.
+* Skrip akan mulai teleportasi otomatis ke lokasi yang ditentukan.
+* Klik ulang untuk **menghentikan** siklus (tombol akan berubah menjadi `STOP AUTO TELEPORT`).
+* Sesuaikan:
+
+  * `Wait Time (Auto)` = waktu diam di tiap titik.
+  * `Delay Between Points` = jeda antar teleport.
+* Klik **`APPLY SETTINGS`** untuk menyimpan pengaturan.
+
+---
+
+## 🕹️ Menggunakan Fitur Manual Teleport
+
+1. Klik tombol **`Select Location...`** di bagian "MANUAL TELEPORT".
+2. Pilih lokasi dari daftar dropdown.
+3. Klik tombol **`TELEPORT`** untuk langsung berpindah ke lokasi terpilih.
+
+---
+
+## 📑 Memantau Status Log
+
+* Bagian **`STATUS LOG`** akan mencatat:
+
+  * Hasil teleportasi.
+  * Status auto-teleport.
+  * Error dan peringatan.
+* Log diperbarui secara real-time dan dibersihkan otomatis setiap **60 detik**.
+
+---
+
+## 📍 Lokasi Teleportasi
+
+Skrip ini mencakup lokasi-lokasi penting berikut:
+
+* `Camp 1 Main Tent`
+* `Camp 1 Checkpoint`
+* `Camp 2 Main Tent`
+* `Camp 2 Checkpoint`
+* `Camp 3 Main Tent`
+* `Camp 3 Checkpoint`
+* `Camp 4 Main Tent`
+* `Camp 4 Checkpoint`
+* `South Pole Checkpoint`
+
+---
+
+## ⚠️ Penanganan Error
+
+* **Anti-Clipping:**
+  Offset posisi dan penonaktifan *CanCollide* untuk mencegah bug terjebak.
+
+* **Logging Error:**
+  Semua error ditampilkan di `STATUS LOG` untuk kemudahan debugging.
+
+* **Retry Otomatis:**
+  Teleportasi akan dicoba ulang jika gagal dalam mode otomatis.
+
+---
+
+## 🧾 Disclaimer
+
+Skrip ini dibuat hanya untuk tujuan **hiburan** dalam game Roblox "Ekspedisi Antartika".
+Penggunaan skrip pihak ketiga **dapat melanggar Ketentuan Layanan Roblox**.
+Gunakan dengan risiko Anda sendiri. Pengembang tidak bertanggung jawab atas konsekuensi penggunaan skrip ini.
+
+
